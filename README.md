@@ -1,4 +1,4 @@
-# WhatsNearScripts
+# WhatsNear - Scripts
 ###### By : Ryan Wang @ HUST
 ###### Email : ryanwang.cs@gmail.com
 
