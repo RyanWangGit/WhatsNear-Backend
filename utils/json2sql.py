@@ -57,7 +57,7 @@ def main():
                       action='store', dest='table_name', default='TABLE',
                       help='The name of the table to be created or inserted.')
     parser.add_option('-j', '--json',
-                      action='store', dest='json_path', default= './data.json',
+                      action='store', dest='json_path',
                       help='The path of the json file.')
     parser.add_option('-s', '--sql',
                       action='store', dest='sql_path',
@@ -70,6 +70,11 @@ def main():
                       help='The encoding of the json and sql file.')
 
     (options, args) = parser.parse_args()
+
+    if not options.json_path:
+        print('Missing json file path, set with -j\n')
+        parser.print_help()
+        exit(-1)
 
     if not options.sql_path:
         (root, ext) = os.path.splitext(options.json_path)
