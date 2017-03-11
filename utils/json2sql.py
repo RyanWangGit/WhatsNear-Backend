@@ -2,11 +2,10 @@
 import codecs
 import json
 import os
-import optparse
+import argparse
 
 
 def json2sql(json_path, sql_path, table_name, encoding='utf-8', is_multi_line=False):
-
     # read the data
     data = []
     with codecs.open(json_path, 'r', encoding=encoding) as f:
@@ -52,37 +51,30 @@ def json2sql(json_path, sql_path, table_name, encoding='utf-8', is_multi_line=Fa
 
 def main():
     # set up option parser
-    parser = optparse.OptionParser(usage='usage: %prog JSON_PATH [options]')
-    parser.add_option('-t', '--table',
-                      action='store', dest='table_name', default='TABLE',
-                      help='The name of the table to be created or inserted.')
-    parser.add_option('-s', '--sql',
-                      action='store', dest='sql_path',
-                      help='The path of the output sql file.')
-    parser.add_option('-l', '--lines',
-                      action='store_true', dest='is_multi_line', default=False,
-                      help='Whether the file contains many objects line by line or a big json object.')
-    parser.add_option('-e', '--encoding',
-                      action='store', dest='encoding', default='utf-8',
-                      help='The encoding of the json and sql file.')
+    parser = argparse.ArgumentParser(description='Convert multiple json-formatted data into sql statements.')
+    parser.add_argument('json_path', action='store')
+    parser.add_argument('-t', '--table',
+                        action='store', dest='table_name', default='TABLE',
+                        help='The name of the table to be created or inserted.')
+    parser.add_argument('-s', '--sql',
+                        action='store', dest='sql_path',
+                        help='The path of the output sql file.')
+    parser.add_argument('-l', '--lines',
+                        action='store_true', dest='is_multi_line', default=False,
+                        help='Whether the file contains many objects line by line or a big json object.')
+    parser.add_argument('-e', '--encoding',
+                        action='store', dest='encoding', default='utf-8',
+                        help='The encoding of the json and sql file.')
 
-    (options, args) = parser.parse_args()
+    results = parser.parse_args()
 
-    json_path = ''
-
-    if len(args) < 1:
-        print('Missing json file path\n')
-        parser.print_help()
-        exit(-1)
-    else:
-        json_path = args[0]
-
-    if not options.sql_path:
+    if not results.sql_path:
         (root, ext) = os.path.splitext(json_path)
         options.sql_path = root + '.sql'
 
-    json2sql(json_path, options.sql_path, options.table_name,
-             encoding=options.encoding, is_multi_line=options.is_multi_line)
+    json2sql(results.json_path, results.sql_path, results.table_name,
+             encoding=args.encoding, is_multi_line=args.is_multi_line)
+
 
 if __name__ == '__main__':
     main()
