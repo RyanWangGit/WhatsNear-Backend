@@ -15,7 +15,7 @@ def json2sql(json_path, sql_path, table_name, encoding='utf-8', is_multi_line=Fa
         else:
             data = json.loads(f)
 
-    # get the keys to creat the table headers
+    # get keys for generating create table statements
     keys = list(data[0].keys())
 
     # open the output file
@@ -23,30 +23,23 @@ def json2sql(json_path, sql_path, table_name, encoding='utf-8', is_multi_line=Fa
 
     # write the create table
     out_file.write('CREATE TABLE IF NOT EXISTS `%s` (\n' % table_name)
-    out_file.write('\t`TABLE_ID` int(11) NOT NULL auto_increment,\n')
+    out_file.write('\t`TABLE_ID` INT(11) NOT NULL AUTO_INCREMENT,\n')
     for key in keys:
-        out_file.write('\t`%s` varchar(128) default NULL,\n' % key)
+        out_file.write('\t`%s` VARCHAR(128) DEFAULT NULL,\n' % key)
     out_file.write('\tPRIMARY KEY (`TABLE_ID`)\n')
     out_file.write(')DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;\n\n')
 
     # write insert statement
+    out_file.write('INSERT INTO %s(%s) VALUES\n' % (table_name, ', '.join(keys)))
+
+    # write multiple value
+    str_list = []
+
     for item in data:
-        out_file.write('INSERT INTO %s(' % table_name)
-        for i in range(len(keys)):
-            if i == len(keys) - 1:
-                out_file.write('%s' % keys[i])
-            else:
-                out_file.write('%s, ' % keys[i])
+        str_list.append('\t(%s)' % ', '.join(['\"' + unicode(value) + '\"' for value in item.values()]))
 
-        out_file.write(') VALUES (')
-
-        for i in range(len(keys)):
-            if i == len(keys) - 1:
-                out_file.write('\"%s\"' % item[keys[i]])
-            else:
-                out_file.write('\"%s\", ' % item[keys[i]])
-
-        out_file.write(');\n')
+    out_file.write(',\n'.join(str_list))
+    out_file.write(';')
 
 
 def main():
@@ -69,11 +62,11 @@ def main():
     results = parser.parse_args()
 
     if not results.sql_path:
-        (root, ext) = os.path.splitext(json_path)
-        options.sql_path = root + '.sql'
+        (root, ext) = os.path.splitext(results.json_path)
+        results.sql_path = root + '.sql'
 
     json2sql(results.json_path, results.sql_path, results.table_name,
-             encoding=args.encoding, is_multi_line=args.is_multi_line)
+             encoding=results.encoding, is_multi_line=results.is_multi_line)
 
 
 if __name__ == '__main__':
