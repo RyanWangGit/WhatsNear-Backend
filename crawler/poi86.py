@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import requests
 import json
 import codecs
-import sys
+from retry.api import retry_call
 
 
 def crawl_poi86(province_page, output_path):
@@ -25,11 +25,9 @@ def crawl_poi86(province_page, output_path):
             # loop for all the items in the district
             page_num = 1
             while True:
-                sys.stdout.write(' ' * 50 + '\r')
-                sys.stdout.flush()
                 print('\t Crawling %d page.' % page_num)
 
-                result = requests.get(url=district_page)
+                result = retry_call(requests.get, fkwargs={'url': district_page}, tries=5)
                 soup_s = BeautifulSoup(result.text, 'lxml')
                 table = soup_s.find('div', class_='panel-body')
 
@@ -39,7 +37,7 @@ def crawl_poi86(province_page, output_path):
                         continue
 
                     # navigate to the specific item page
-                    result = requests.get(url=root_url + item.td.a['href'])
+                    result = retry_call(requests.get, fkwargs={'url': root_url + item.td.a['href']}, tries=5)
                     soup = BeautifulSoup(result.text, 'lxml')
 
                     # fill the item
@@ -58,8 +56,7 @@ def crawl_poi86(province_page, output_path):
 
                     json.dump(json_obj, out_file, encoding='utf-8', ensure_ascii=False)
                     out_file.write('\n')
-                    sys.stdout.write('\t\tCrawled %d items' % item_count + '\r')
-                    sys.stdout.flush()
+                    print('\t\tCrawled %d items' % item_count + '\r')
                     item_count += 1
 
                 out_file.flush()
