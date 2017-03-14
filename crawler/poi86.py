@@ -25,7 +25,7 @@ def crawl_poi86(province_page, output_path):
             # loop for all the items in the district
             page_num = 1
             while True:
-                sys.stdout.write(' ' * 10 + '\r')
+                sys.stdout.write(' ' * 50 + '\r')
                 sys.stdout.flush()
                 print('\t Crawling %d page.' % page_num)
 
