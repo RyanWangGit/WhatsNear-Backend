@@ -6,4 +6,6 @@ The WhastNear project uses Github Pages to present itself to the public, thus th
 
 This very project is of course not the so-called `backend` for `WhatsNear`, it is a project that implements multiple different algorithms to dig / mine the associations between `POIs`(Point of Interests) from a library of pure `POIs`, the mined results are thus assembled and sent to [WhatsNear](https://github.com/RyanWangGit/WhatsNear) for visualization purposes.
 
+## License
+[MIT](https://github.com/RyanWangGit/WhatsNear-Backend/blob/master/LICENSE).
 
