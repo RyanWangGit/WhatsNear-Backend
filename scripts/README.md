@@ -1,8 +1,6 @@
-# Utils
+# WhatsNear-Backend - Scripts
 
-This folder contains utility scripts to process data / transform data etc.
-
-### json2sql.py (Python 2.7+)
+## json2sql.py (Python 2.7+)
 
 Converts `json` to `SQL` statements that create the table and inserts all the data. 
 
@@ -32,3 +30,7 @@ optional arguments:
   -e ENCODING, --encoding ENCODING
                         The encoding of the json and sql file.
 ```
+
+## poi86.py
+
+This script is used to get POI data from [poi86.com](http://www.poi86.com).
