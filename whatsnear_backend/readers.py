@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 def csvreader(file_path, encoding='utf-8'):
     import csv
     import codecs

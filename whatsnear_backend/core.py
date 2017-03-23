@@ -1,1 +1,1 @@
-def d
+# -*- coding: utf-8 -*-
