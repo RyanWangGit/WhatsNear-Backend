@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-def csvread(file_path):
+def csvreader(file_path):
     import csv
 
     with open(file_path, 'r') as csv_file:

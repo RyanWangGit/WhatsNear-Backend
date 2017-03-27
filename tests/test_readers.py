@@ -4,7 +4,7 @@ import whatsnear_backend.readers as readers
 
 def test_csvread():
 
-    out = readers.csvread('./tests/data/test_original.csv')
+    out = readers.csvreader('./tests/data/test_original.csv')
     print(out)
     assert out == [{
         'col1': '115.491835',
