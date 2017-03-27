@@ -2,7 +2,7 @@
 import whatsnear_backend.readers as readers
 
 
-def test_csvread():
+def test_csvreader():
 
     out = readers.csvreader('./tests/data/test_original.csv')
     print(out)
