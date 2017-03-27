@@ -44,7 +44,7 @@ def json2sql(json_path, sql_path, table_name, encoding='utf-8', is_multi_line=Fa
 def main():
     import argparse
 
-    # set up option parser
+    # set up argument parser
     parser = argparse.ArgumentParser(description='Convert multiple json-formatted data into sql statements.')
     parser.add_argument('json_path', action='store')
     parser.add_argument('-t', '--table',
