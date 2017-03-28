@@ -22,6 +22,6 @@ def csvwriter(nodes, infos, edges, path):
 
     with open(path + 'edges.csv', 'w') as file:
         for edge in edges:
-            file.write('%d,%d\n' % (edge[0], edge[1]))
+            file.write('%d,%d,%d\n' % (edge[0], edge[1], edge[2]))
 
 
