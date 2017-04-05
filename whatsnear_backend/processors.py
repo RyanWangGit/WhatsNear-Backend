@@ -8,6 +8,13 @@ def sample_preprocessor(points, sample_num):
     return random.sample(points, sample_num)
 
 
+def addvalue_preprocessor(points):
+    for point in points:
+        point['value'] = 0
+
+    return points
+
+
 def random_processor(points, edge_num):
     import random
     nodes = []
