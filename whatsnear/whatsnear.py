@@ -8,9 +8,10 @@ class WhatsNearHTTPHandler(BaseHTTPRequestHandler):
         params = {}
         if '?' in self.path:
             path, args = self.path.split('?')
-            for param in args.split('&'):
-                name, value = param.split('=')
-                params[name] = value
+            if not args == '':
+                for param in args.split('&'):
+                    name, value = param.split('=')
+                    params[name] = value
 
         return path, params
 
@@ -28,9 +29,11 @@ class WhatsNearHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(self.respond_query(params))
 
     def respond_query(self, params):
+        if 'points' not in params:
+            return 'Not enough parameters.'
+
         points = json.loads(params['points'])
         return 'Hello World!'
-
 
 
 def start_server(port=8080):
