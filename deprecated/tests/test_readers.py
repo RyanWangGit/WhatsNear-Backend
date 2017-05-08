@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import whatsnear_backend.readers as readers
+from deprecated import whatsnear_backend as readers
 
 
 def test_csvreader():
