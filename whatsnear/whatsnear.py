@@ -1,4 +1,5 @@
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+import json
 
 
 class WhatsNearHTTPHandler(BaseHTTPRequestHandler):
@@ -24,7 +25,12 @@ class WhatsNearHTTPHandler(BaseHTTPRequestHandler):
 
         # prepare the content
         if path == '/query':
-            self.wfile.write('Hello')
+            self.wfile.write(self.respond_query(params))
+
+    def respond_query(self, params):
+        points = json.loads(params['points'])
+        return 'Hello World!'
+
 
 
 def start_server(port=8080):
