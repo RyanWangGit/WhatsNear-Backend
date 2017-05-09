@@ -1,3 +1,4 @@
+import csv
 import whatsnear
 
 if __name__ == '__main__':
@@ -7,7 +8,14 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--port',
                         action='store', dest='port', default=80, type=int,
                         help='The port to listen on.', required=False)
+    parser.add_argument('-f', '--file',
+                        action='store', dest='file', type=str,
+                        help='The points data file to read from. Must be .csv file', required=True)
     results = parser.parse_args()
 
+    with open(results.file, 'r') as csv_file:
+        reader = csv.DictReader(csv_file, restkey=None, restval=None)
+        points = [row for row in reader]
+
     # start server
-    whatsnear.start_server(results.port)
+    whatsnear.start_server(points, results.port)
