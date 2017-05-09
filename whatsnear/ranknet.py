@@ -102,7 +102,7 @@ class RankNet(object):
         with tf.Session() as sess:
             # summary_op = tf.summary.merge_all()
             # writer = tf.summary.FileWriter("./logs/", sess.graph)
-            init = tf.initialize_all_variables()
+            init = tf.global_variables_initializer()
             sess.run(init)
             for epoch in range(0, 10000):
                 X, Y = self.get_train_data()
