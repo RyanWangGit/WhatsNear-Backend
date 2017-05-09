@@ -1,5 +1,6 @@
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import json
+from ranknet import RankNet
 
 
 class WhatsNearHTTPHandler(BaseHTTPRequestHandler):
@@ -34,17 +35,22 @@ class WhatsNearHTTPHandler(BaseHTTPRequestHandler):
         if 'points' not in params:
             return 'Not enough parameters.'
 
-        points = json.loads(params['points'])
-        return 'Hello World!'
+        query_points = json.loads(params['points'])
+
+        return json.dumps(ranknet.rank(query_points))
 
     def respond_help(self):
         return \
             'Usage: \n' \
             '/query - [[lng, lat], [lng, lat] ...]'
 
+ranknet = RankNet()
 
-def start_server(port=8080):
+
+def start_server(points, port=8080):
+    ranknet.load(points)
+
     ip = '127.0.0.1'
-    print('Start hosting at http://%s:%d.' % (ip, port))
     http_server = HTTPServer((ip, int(port)), WhatsNearHTTPHandler)
+    print('Start hosting at http://%s:%d.' % (ip, port))
     http_server.serve_forever()
