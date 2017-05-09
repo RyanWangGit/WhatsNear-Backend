@@ -4,7 +4,7 @@ import json
 
 class WhatsNearHTTPHandler(BaseHTTPRequestHandler):
     def parse_parameters(self):
-        path = ''
+        path = self.path
         params = {}
         if '?' in self.path:
             path, args = self.path.split('?')
@@ -25,7 +25,9 @@ class WhatsNearHTTPHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
         # prepare the content
-        if path == '/query':
+        if path == '/' or path == '':
+            self.wfile.write(self.respond_help())
+        elif path == '/query':
             self.wfile.write(self.respond_query(params))
 
     def respond_query(self, params):
@@ -35,7 +37,14 @@ class WhatsNearHTTPHandler(BaseHTTPRequestHandler):
         points = json.loads(params['points'])
         return 'Hello World!'
 
+    def respond_help(self):
+        return \
+            'Usage: \n' \
+            '/query - [[lng, lat], [lng, lat] ...]'
+
 
 def start_server(port=8080):
-    http_server = HTTPServer(('127.0.0.1', int(port)), WhatsNearHTTPHandler)
+    ip = '127.0.0.1'
+    print('Start hosting at http://%s:%d.' % (ip, port))
+    http_server = HTTPServer((ip, int(port)), WhatsNearHTTPHandler)
     http_server.serve_forever()
