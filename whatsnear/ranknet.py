@@ -12,10 +12,12 @@ class RankNet(object):
     def __init__(self):
         self._points = []
 
-    def load(self, points):
-        self._points = points
+    def _prepare_train_data(self, points):
+        start_time = time.clock()
+        print('[TensorFlow] Preparing training data...')
 
-    def _prepare_train_data(self):
+        end_time = time.clock()
+        print('[TensorFlow] Traning data prepared in %f seconds.' % (end_time - start_time))
         pass
 
     def get_train_data(self, batch_size=32):
@@ -45,7 +47,9 @@ class RankNet(object):
 
         return (np.array(X1), np.array(X2)), (np.array(Y1), np.array(Y2))
 
-    def train(self):
+    def train(self, points):
+        self._prepare_train_data(points)
+
         print('[TensorFlow] Start training model...')
         start_time = time.clock()
 
@@ -126,5 +130,9 @@ class RankNet(object):
         print '[TensorFlow] Model learned in %f seconds' % (end_time - start_time)
         return
 
-    def rank(self, query_points):
+    def rank(self, query_points, caller):
+        print('[TensorFlow - 0x%x] Start ranking the query points with size %d.' % (id(caller), len(query_points)))
+
+        print('[TensorFlow - 0x%x] Ranking finished.' % id(caller))
+
         return query_points
