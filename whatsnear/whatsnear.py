@@ -29,5 +29,5 @@ def start_server(points, port=8080):
 
     ip = '127.0.0.1'
     app.listen(port, ip)
-    print('Start hosting at http://%s:%d.' % (ip, port))
+    print('[WhatsNear] Start hosting at http://%s:%d.' % (ip, port))
     tornado.ioloop.IOLoop.current().start()
