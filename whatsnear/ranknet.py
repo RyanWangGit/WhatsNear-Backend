@@ -108,7 +108,7 @@ class RankNet(object):
             # writer = tf.summary.FileWriter("./logs/", sess.graph)
             init = tf.global_variables_initializer()
             sess.run(init)
-            for epoch in range(0, 10000):
+            for epoch in range(0, 100):
                 X, Y = self.get_train_data()
                 sess.run(train_op, feed_dict={x1: X[0], x2: X[1], o1: Y[0], o2: Y[1]})
                 if epoch % 10 == 0:
