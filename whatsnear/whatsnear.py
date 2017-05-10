@@ -14,14 +14,21 @@ class WhatsNearHandler(tornado.web.RequestHandler):
 
 class QueryHandler(tornado.web.RequestHandler):
     def get(self):
-        query_points = self.get_argument('points')
+        query_points = json.loads(self.get_argument('points'))
         self.add_header('Content-type', 'application/json')
-        self.write(json.dumps(ranknet.rank(query_points)))
+
+        result = []
+        for point in ranknet.rank(query_points, self):
+            result.append({
+                'lnglat': point,
+                'surroundings': []
+            })
+
+        self.write(json.dumps(result))
 
 
 def start_server(points, port=8080):
-    ranknet.load(points)
-    ranknet.train()
+    ranknet.train(points)
 
     app = tornado.web.Application([
         ('/', WhatsNearHandler),
