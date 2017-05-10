@@ -127,7 +127,7 @@ class RankNet(object):
 
         end_time = time.clock()
 
-        print '[TensorFlow] Model learned in %f seconds' % (end_time - start_time)
+        print '[TensorFlow] Model trained in %f seconds' % (end_time - start_time)
         return
 
     def rank(self, query_points, caller):
