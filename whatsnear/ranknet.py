@@ -15,6 +15,9 @@ class RankNet(object):
     def load(self, points):
         self._points = points
 
+    def _prepare_train_data(self):
+        pass
+
     def get_train_data(self, batch_size=32):
         # generate data with 10 dimensions
         X1, X2 = [], []
@@ -42,7 +45,8 @@ class RankNet(object):
 
         return (np.array(X1), np.array(X2)), (np.array(Y1), np.array(Y2))
 
-    def rank(self, query_points):
+    def train(self):
+        print('[TensorFlow] Start training model...')
         start_time = time.clock()
 
         with tf.name_scope("input"):
@@ -117,16 +121,10 @@ class RankNet(object):
                     #for k in range(0, len(o12_v)):
                         #print "k[%d] o12_v[%f] h_o12_v[%f]" % (k, o12_v[k], h_o12_v[k])
 
-        result = []
-
-        for point in query_points:
-            result.append({
-                'lnglat': point,
-                'surroundings': []
-            })
-
         end_time = time.clock()
 
-        print '[TensorFlow] Server presents learning result in %f seconds' % (end_time - start_time)
+        print '[TensorFlow] Model learned in %f seconds' % (end_time - start_time)
+        return
 
-        return result
+    def rank(self, query_points):
+        return query_points

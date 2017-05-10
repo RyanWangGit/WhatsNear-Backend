@@ -21,6 +21,7 @@ class QueryHandler(tornado.web.RequestHandler):
 
 def start_server(points, port=8080):
     ranknet.load(points)
+    ranknet.train()
 
     app = tornado.web.Application([
         ('/', WhatsNearHandler),
