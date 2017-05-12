@@ -59,73 +59,141 @@ class RankNet(object):
         # radius to calculate features
         r = 200
 
+        # calculate global parameters
         total_num = int(conn.execute('''SELECT COUNT(*) FROM \'Beijing-Checkins\'''').fetchone()[0])
-        #bar = Bar('Calculating', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
+        categories = {}
+
+        bar = Bar('Calculating neighbors', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
+        for row in conn.execute('''SELECT category, COUNT(*) AS num FROM "Beijing-Checkins" GROUP BY category'''):
+            categories[row[0]] = int(row[1])
+
+        # calculate and store the neighboring points
+        all_points = []
         for row in conn.execute('''SELECT lat,lng,category,checkins,geohash FROM \'Beijing-Checkins\''''):
-            # add label
-            self._labels.append([int(row[3])])
-
-            # calculate features
-            x = []
-
-            # calculate global parameters
-
-
             # calculate neighboring points
             neighbors = []
             potential_neighbors = []
 
             for point in conn.execute('''SELECT lat,lng,category,checkins FROM \'Beijing-Checkins\' 
-                                         WHERE geohash LIKE \'%s%%\'''' % row[4][:6]):
+                                                     WHERE geohash LIKE \'%s%%\'''' % row[4][:6]):
                 potential_neighbors.append(point)
 
             for neighbor in potential_neighbors:
                 if haversine((float(neighbor[0]), float(neighbor[1])), (float(row[0]), float(row[1]))) * 1000 <= r:
                     neighbors.append(neighbor)
 
+            all_points.append({
+                'point': row,
+                'neighbors': neighbors
+            })
+
+            bar.next()
+        bar.finish()
+
+
+        # calculate global category parameters
+        mean_category_number = {}
+        category_coefficient = {}
+        for outer, _ in categories.items():
+            for inner, _ in categories.items():
+                mean_category_number[outer][inner] = 0
+                category_coefficient[outer][inner] = 0
+
+        bar = Bar('Calculating mean category numbers', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
+        for point in all_points:
+            # unpack point
+            row = point['point']
+            neighbors = point['neighbors']
+
+            for neighbor in neighbors:
+                mean_category_number[neighbor[2]][row[2]] += 1
+
+            bar.next()
+
+        for p, _ in categories.items():
+            for l, _ in categories.items():
+                mean_category_number[p][l] /= categories[l]
+
+        bar.finish()
+
+        bar = Bar('Calculating category coefficients', suffix='%(index)d / %(max)d, %(percent)d%%', max=len(categories) * len(categories))
+        for p, _ in categories.items():
+            for l, _ in categories.items():
+                k_prefix = float(total_num - categories[p]) / (categories[p] * categories[l])
+
+                k_suffix = 0
+                for pt in all_points:
+                    if pt['point'][2] == p:
+                        # TODO: this could be extracted to a function
+                        neighbor_categories = {}
+                        for category, _ in categories.items():
+                            neighbor_categories[category] = 0
+                        for neighbor in pt['neighbors']:
+                            neighbor_categories[neighbor[2]] += 1
+
+                        k_suffix += float(neighbor_categories[l]) / (len(pt['neighbors']) - neighbor_categories[p])
+
+                category_coefficient[p][l] = k_prefix * k_suffix
+
+                bar.next()
+
+        bar.finish()
+
+        bar = Bar('Calculating features', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
+        # calculate features
+        for point in all_points:
+            # unpack point
+            row = point['point']
+            neighbors = point['neighbors']
+
+            # add label
+            self._labels.append([int(row[3])])
+
+            # calculate sub-global parameters
+            neighbor_categories = {}
+            for category, _ in categories.items():
+                neighbor_categories[category] = 0
+            for neighbor in neighbors:
+                neighbor_categories[neighbor[2]] += 1
+
+            training_category = u'生活娱乐'
+
+            x = []
+
             # density
             x.append(len(neighbors))
 
             # neighbors entropy
             entropy = 0
-            categories = {}
-            for neighbor in neighbors:
-                if neighbor[2] not in categories:
-                    categories[neighbor[2]] = 1
-                else:
-                    categories[neighbor[2]] += 1
-
-            for (key, value) in categories.items():
+            for (key, value) in neighbor_categories.items():
                 entropy += float(value) / len(neighbors) * -1 * math.log(float(value) / len(neighbors), 10)
 
             x.append(entropy)
 
             # competitiveness
             competitiveness = 0
-            category = u'生活娱乐'
-            if category in categories:
-                competitiveness = float(categories[category]) / len(neighbors)
+            if training_category in neighbor_categories:
+                competitiveness = -1 * float(neighbor_categories[training_category]) / len(neighbors)
 
             x.append(competitiveness)
 
             # quality by jensen
+            jenson_quality = 0
+            for category, _ in categories.items():
+                jenson_quality += math.log(category_coefficient[category][training_category]) * (neighbor_categories[category] - mean_category_number[category][training_category])
+
+            # area popularity
             popularity = 0
             for neighbor in neighbors:
                 popularity += int(neighbor[3])
 
             x.append(popularity)
 
-
-            # area popularity
-
-
-
-
             self._features.append(x)
-            print(x)
-            #bar.next()
 
-        #bar.finish()
+            bar.next()
+
+        bar.finish()
 
         end_time = time.clock()
         print('[RankNet] Training data calculated in %f seconds.' % (end_time - start_time))
