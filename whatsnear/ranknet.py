@@ -1,8 +1,13 @@
 # coding=utf-8
 import tensorflow as tf
 import numpy as np
+import sqlite3
+from haversine import haversine
+import geohash
+import math
 import random
 import time
+import os
 
 feature_num = 10
 h1_num = 10
@@ -10,15 +15,123 @@ h1_num = 10
 
 class RankNet(object):
     def __init__(self):
-        self._points = []
+        self._labels = []
+        self._features = []
 
-    def _prepare_train_data(self, points):
+    def _read_train_data(self, train_file):
+        print('[RankNet] Pre-calculated train file found, reading from external file...')
         start_time = time.clock()
-        print('[TensorFlow] Preparing training data...')
+
+        with open(train_file, 'r') as f:
+            for line in f.readlines():
+                parts = line.split(' ')
+                self._labels.append([float(parts[0])])
+                self._features.append([float(feature) for feature in parts[1:]])
 
         end_time = time.clock()
-        print('[TensorFlow] Traning data prepared in %f seconds.' % (end_time - start_time))
-        pass
+        print('[RankNet] Training data read in %f seconds.' % (end_time - start_time))
+
+    def _write_train_data(self, train_file):
+        with open(train_file, 'w') as f:
+            for i in range(0, len(self._labels)):
+                row = []
+                row.extend(self._labels[i])
+                row.extend(self._features[i])
+                f.write(' '.join(row))
+        print('[RankNet] Calculated training data stored into %s.' % train_file)
+
+    def _calculate_train_data(self, database):
+        from progress.bar import Bar
+
+        print('[RankNet] Pre-calculated train file not found, calculating training data...')
+        start_time = time.clock()
+
+        conn = sqlite3.connect(database)
+        c = conn.cursor()
+        # if geohash has never been calculated
+        if c.execute('''SELECT geohash FROM \'Beijing-Checkins\' LIMIT 1''').fetchone()[0] is None:
+            # calculate the geohash value and store in database
+            for row in c.execute('''SELECT id,lng,lat FROM \'Beijing-Checkins\''''):
+                conn.execute('''UPDATE \'Beijing-Checkins\' set geohash=? WHERE id=?''',
+                             (geohash.encode(float(row[2]), float(row[1])), row[0]))
+            conn.commit()
+
+        # radius to calculate features
+        r = 200
+
+        total_num = int(conn.execute('''SELECT COUNT(*) FROM \'Beijing-Checkins\'''').fetchone()[0])
+        #bar = Bar('Calculating', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
+        for row in conn.execute('''SELECT lat,lng,category,checkins,geohash FROM \'Beijing-Checkins\''''):
+            # add label
+            self._labels.append([int(row[3])])
+
+            # calculate features
+            x = []
+
+            # calculate global parameters
+
+
+            # calculate neighboring points
+            neighbors = []
+            potential_neighbors = []
+
+            for point in conn.execute('''SELECT lat,lng,category,checkins FROM \'Beijing-Checkins\' 
+                                         WHERE geohash LIKE \'%s%%\'''' % row[4][:6]):
+                potential_neighbors.append(point)
+
+            for neighbor in potential_neighbors:
+                if haversine((float(neighbor[0]), float(neighbor[1])), (float(row[0]), float(row[1]))) * 1000 <= r:
+                    neighbors.append(neighbor)
+
+            # density
+            x.append(len(neighbors))
+
+            # neighbors entropy
+            entropy = 0
+            categories = {}
+            for neighbor in neighbors:
+                if neighbor[2] not in categories:
+                    categories[neighbor[2]] = 1
+                else:
+                    categories[neighbor[2]] += 1
+
+            for (key, value) in categories.items():
+                entropy += float(value) / len(neighbors) * -1 * math.log(float(value) / len(neighbors), 10)
+
+            x.append(entropy)
+
+            # competitiveness
+            competitiveness = 0
+            category = u'生活娱乐'
+            if category in categories:
+                competitiveness = float(categories[category]) / len(neighbors)
+
+            x.append(competitiveness)
+
+            # quality by jensen
+            popularity = 0
+            for neighbor in neighbors:
+                popularity += int(neighbor[3])
+
+            x.append(popularity)
+
+
+            # area popularity
+
+
+
+
+            self._features.append(x)
+            print(x)
+            #bar.next()
+
+        #bar.finish()
+
+        end_time = time.clock()
+        print('[RankNet] Training data calculated in %f seconds.' % (end_time - start_time))
+
+        # store calculated train data
+        self._write_train_data(os.path.dirname(database) + '/train.txt')
 
     def get_train_data(self, batch_size=32):
         # generate data with 10 dimensions
@@ -47,8 +160,11 @@ class RankNet(object):
 
         return (np.array(X1), np.array(X2)), (np.array(Y1), np.array(Y2))
 
-        self._prepare_train_data(points)
     def train(self, database, train_file):
+        if train_file is None or not os.path.exists(train_file):
+            self._calculate_train_data(database)
+        else:
+            self._read_train_data(train_file)
 
         print('[TensorFlow] Start training model...')
         start_time = time.clock()
