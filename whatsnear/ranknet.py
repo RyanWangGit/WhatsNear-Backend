@@ -47,8 +47,8 @@ class RankNet(object):
 
         return (np.array(X1), np.array(X2)), (np.array(Y1), np.array(Y2))
 
-    def train(self, points):
         self._prepare_train_data(points)
+    def train(self, database, train_file):
 
         print('[TensorFlow] Start training model...')
         start_time = time.clock()

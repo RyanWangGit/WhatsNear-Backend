@@ -1,3 +1,5 @@
+# coding: utf-8
+
 import csv
 import time
 import whatsnear
@@ -9,20 +11,13 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--port',
                         action='store', dest='port', default=80, type=int,
                         help='The port to listen on.', required=False)
-    parser.add_argument('-f', '--file',
-                        action='store', dest='file', type=str,
-                        help='The points data file to read from. Must be .csv file', required=True)
+    parser.add_argument('-s', '--sqlite',
+                        action='store', dest='sqlite', type=str,
+                        help='The SQLite3 database to read from.', required=True)
+    parser.add_argument('-t', '--train',
+                        action='store', dest='train', type=str,
+                        help='The training matrix file to read from.', required=False)
     results = parser.parse_args()
 
-    print('[WhatsNear] Loading csv file...')
-    start_time = time.clock()
-
-    with open(results.file, 'r') as csv_file:
-        reader = csv.DictReader(csv_file, restkey=None, restval=None)
-        points = [row for row in reader]
-
-    end_time = time.clock()
-    print('[WhatsNear] Csv file loaded in %f seconds, starting server...' % (end_time - start_time))
-
     # start server
-    whatsnear.start_server(points, results.port)
+    whatsnear.start_server(results.sqlite, results.train, results.port)

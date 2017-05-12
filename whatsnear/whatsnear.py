@@ -27,9 +27,11 @@ class QueryHandler(tornado.web.RequestHandler):
         self.write(json.dumps(result))
 
 
-def start_server(points, port=8080):
-    ranknet.train(points)
+def start_server(database, train=None, port=8080):
+    # train the model
+    ranknet.train(database, train)
 
+    # start hosting the server
     app = tornado.web.Application([
         ('/', WhatsNearHandler),
         ('/query', QueryHandler)
