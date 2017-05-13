@@ -18,8 +18,15 @@ class RankNet(object):
     def __init__(self):
         self._labels = []
         self._features = []
+        self._is_ready = False
+        self._database = ''
+        self._conn = None
+
+        # global parameters
         self._mean_category_number = {}
         self._category_coefficient = {}
+        self._categories = {}
+        self._all_points = []
 
     def _read_train_data(self, train_file):
         print('[RankNet] Pre-calculated train file found, reading from external file...')
@@ -42,100 +49,139 @@ class RankNet(object):
             f.write(json.dumps(self._features))
         print('[RankNet] Calculated training data stored into %s.' % train_file)
 
-    def _calculate_train_data(self, database):
+    def _neighbor_categories(self, point):
+        # calculate sub-global parameters
+        neighbor_categories = {}
+        for category, _ in self._categories.items():
+            neighbor_categories[category] = 0
+        for neighbor in point['neighbors']:
+            neighbor_categories[neighbor['category']] += 1
+        return neighbor_categories
+
+    def _vectorize_point(self, point, training_category):
+
+        neighbor_categories = self._neighbor_categories(point)
+
+        x = []
+
+        # density
+        x.append(len(point['neighbors']))
+
+        # neighbors entropy
+        entropy = 0
+        for (key, value) in neighbor_categories.items():
+            entropy += float(value) / len(point['neighbors']) * -1 * math.log(float(value) / len(point['neighbors']), 10)
+
+        x.append(entropy)
+
+        # competitiveness
+        competitiveness = 0
+        if training_category in neighbor_categories:
+            competitiveness = -1 * float(neighbor_categories[training_category]) / len(point['neighbors'])
+
+        x.append(competitiveness)
+
+        # quality by jensen
+        jenson_quality = 0
+        for category, _ in self._categories.items():
+            jenson_quality += math.log(self._category_coefficient[category][training_category]) * (
+            neighbor_categories[category] - self._mean_category_number[category][training_category])
+
+        # area popularity
+        popularity = 0
+        for neighbor in point['neighbors']:
+            popularity += int(neighbor['checkins'])
+
+        x.append(popularity)
+
+    def _get_neighboring_points(self, lng, lat, geo_hash, r):
+        neighbors = []
+        potential_neighbors = []
+
+        for point in self._conn.execute('''SELECT lat,lng,category,checkins,id FROM \'Beijing-Checkins\' 
+                                                             WHERE geohash LIKE \'%s%%\'''' % geo_hash[:6]):
+            potential_neighbors.append(point)
+
+        for neighbor in potential_neighbors:
+            if haversine((float(neighbor[0]), float(neighbor[1])), (float(lat), float(lng))) * 1000 <= r:
+                neighbors.append({
+                    'id': neighbor[4],
+                    'category': neighbor[2],
+                    'checkins': neighbor[3]
+                })
+
+        return neighbors
+
+    def _calculate_train_data(self):
         from progress.bar import Bar
 
         print('[RankNet] Pre-calculated train file not found, calculating training data...')
         start_time = time.clock()
 
-        conn = sqlite3.connect(database)
-        c = conn.cursor()
+        c = self._conn.cursor()
         # if geohash has never been calculated
         if c.execute('''SELECT geohash FROM \'Beijing-Checkins\' LIMIT 1''').fetchone()[0] is None:
             # calculate the geohash value and store in database
             for row in c.execute('''SELECT id,lng,lat FROM \'Beijing-Checkins\''''):
-                conn.execute('''UPDATE \'Beijing-Checkins\' set geohash=? WHERE id=?''',
+                self._conn.execute('''UPDATE \'Beijing-Checkins\' set geohash=? WHERE id=?''',
                              (geohash.encode(float(row[2]), float(row[1])), row[0]))
-            conn.commit()
+            self._conn.commit()
 
         # radius to calculate features
         r = 200
 
         # calculate global parameters
-        total_num = int(conn.execute('''SELECT COUNT(*) FROM \'Beijing-Checkins\'''').fetchone()[0])
+        total_num = int(self._conn.execute('''SELECT COUNT(*) FROM \'Beijing-Checkins\'''').fetchone()[0])
         categories = {}
-
-        bar = Bar('Calculating neighbors', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
-        for row in conn.execute('''SELECT category, COUNT(*) AS num FROM "Beijing-Checkins" GROUP BY category'''):
+        for row in self._conn.execute('''SELECT category, COUNT(*) AS num FROM "Beijing-Checkins" GROUP BY category'''):
             categories[row[0]] = int(row[1])
 
         # calculate and store the neighboring points
-        all_points = []
-        for row in conn.execute('''SELECT lat,lng,category,checkins,geohash FROM \'Beijing-Checkins\''''):
-            # calculate neighboring points
-            neighbors = []
-            potential_neighbors = []
-
-            for point in conn.execute('''SELECT lat,lng,category,checkins FROM \'Beijing-Checkins\' 
-                                                     WHERE geohash LIKE \'%s%%\'''' % row[4][:6]):
-                potential_neighbors.append(point)
-
-            for neighbor in potential_neighbors:
-                if haversine((float(neighbor[0]), float(neighbor[1])), (float(row[0]), float(row[1]))) * 1000 <= r:
-                    neighbors.append(neighbor)
-
-            all_points.append({
-                'point': row,
-                'neighbors': neighbors
+        bar = Bar('Calculating neighbors', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
+        for row in self._conn.execute('''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\''''):
+            self._all_points.append({
+                'id': row[5],
+                'category': row[3],
+                'checkins': row[4],
+                'neighbors': self._get_neighboring_points(row[0], row[1], row[2], r)
             })
-
             bar.next()
         bar.finish()
 
-
         # calculate global category parameters
-        mean_category_number = {}
-        category_coefficient = {}
         for outer, _ in categories.items():
             for inner, _ in categories.items():
-                mean_category_number[outer][inner] = 0
-                category_coefficient[outer][inner] = 0
+                self._mean_category_number[outer][inner] = 0
+                self._category_coefficient[outer][inner] = 0
 
+        # calculate mean category numbers
         bar = Bar('Calculating mean category numbers', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
-        for point in all_points:
-            # unpack point
-            row = point['point']
-            neighbors = point['neighbors']
-
-            for neighbor in neighbors:
-                mean_category_number[neighbor[2]][row[2]] += 1
+        for point in self._all_points:
+            for neighbor in point['neighbors']:
+                self._mean_category_number[neighbor['category']][point['category']] += 1
 
             bar.next()
 
         for p, _ in categories.items():
             for l, _ in categories.items():
-                mean_category_number[p][l] /= categories[l]
+                self._mean_category_number[p][l] /= categories[l]
 
         bar.finish()
 
+        # calculate category coefficients
         bar = Bar('Calculating category coefficients', suffix='%(index)d / %(max)d, %(percent)d%%', max=len(categories) * len(categories))
         for p, _ in categories.items():
             for l, _ in categories.items():
                 k_prefix = float(total_num - categories[p]) / (categories[p] * categories[l])
 
                 k_suffix = 0
-                for pt in all_points:
-                    if pt['point'][2] == p:
-                        # TODO: this could be extracted to a function
-                        neighbor_categories = {}
-                        for category, _ in categories.items():
-                            neighbor_categories[category] = 0
-                        for neighbor in pt['neighbors']:
-                            neighbor_categories[neighbor[2]] += 1
+                for pt in self._all_points:
+                    if pt['category'] == p:
+                        neighbor_categories = self._neighbor_categories(pt)
 
                         k_suffix += float(neighbor_categories[l]) / (len(pt['neighbors']) - neighbor_categories[p])
 
-                category_coefficient[p][l] = k_prefix * k_suffix
+                self._category_coefficient[p][l] = k_prefix * k_suffix
 
                 bar.next()
 
@@ -143,56 +189,11 @@ class RankNet(object):
 
         bar = Bar('Calculating features', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
         # calculate features
-        for point in all_points:
-            # unpack point
-            row = point['point']
-            neighbors = point['neighbors']
-
+        for point in self._all_points:
             # add label
-            self._labels.append([int(row[3])])
-
-            # calculate sub-global parameters
-            neighbor_categories = {}
-            for category, _ in categories.items():
-                neighbor_categories[category] = 0
-            for neighbor in neighbors:
-                neighbor_categories[neighbor[2]] += 1
-
-            training_category = u'生活娱乐'
-
-            x = []
-
-            # density
-            x.append(len(neighbors))
-
-            # neighbors entropy
-            entropy = 0
-            for (key, value) in neighbor_categories.items():
-                entropy += float(value) / len(neighbors) * -1 * math.log(float(value) / len(neighbors), 10)
-
-            x.append(entropy)
-
-            # competitiveness
-            competitiveness = 0
-            if training_category in neighbor_categories:
-                competitiveness = -1 * float(neighbor_categories[training_category]) / len(neighbors)
-
-            x.append(competitiveness)
-
-            # quality by jensen
-            jenson_quality = 0
-            for category, _ in categories.items():
-                jenson_quality += math.log(category_coefficient[category][training_category]) * (neighbor_categories[category] - mean_category_number[category][training_category])
-
-            # area popularity
-            popularity = 0
-            for neighbor in neighbors:
-                popularity += int(neighbor[3])
-
-            x.append(popularity)
-
-            self._features.append(x)
-
+            self._labels.append([int(point['checkins'])])
+            # add feature
+            self._features.append(self._vectorize_point(point, u'生活娱乐'))
             bar.next()
 
         bar.finish()
@@ -201,7 +202,7 @@ class RankNet(object):
         print('[RankNet] Training data calculated in %f seconds.' % (end_time - start_time))
 
         # store calculated train data
-        self._write_train_data(os.path.dirname(database) + '/train.txt')
+        self._write_train_data(os.path.dirname(self._database) + '/train.txt')
 
     def get_train_data(self, batch_size=32):
         # generate data with 10 dimensions
@@ -231,8 +232,12 @@ class RankNet(object):
         return (np.array(X1), np.array(X2)), (np.array(Y1), np.array(Y2))
 
     def train(self, database, train_file):
+        # open database connection
+        self._database = database
+        self._conn = sqlite3.connect(database)
+
         if train_file is None or not os.path.exists(train_file):
-            self._calculate_train_data(database)
+            self._calculate_train_data()
         else:
             self._read_train_data(train_file)
 
@@ -318,7 +323,11 @@ class RankNet(object):
 
     def rank(self, query_points, caller):
         print('[TensorFlow - 0x%x] Start ranking the query points with size %d.' % (id(caller), len(query_points)))
-
+        for point in query_points:
+            x = self._vectorize_point(point)
+            # TODO: calculate the score with x
+            score = 0
+            point.append(score)
         print('[TensorFlow - 0x%x] Ranking finished.' % id(caller))
 
         return query_points
