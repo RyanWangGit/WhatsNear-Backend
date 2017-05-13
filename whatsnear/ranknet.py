@@ -4,6 +4,7 @@ import numpy as np
 import sqlite3
 from haversine import haversine
 import geohash
+import json
 import math
 import random
 import time
@@ -17,27 +18,28 @@ class RankNet(object):
     def __init__(self):
         self._labels = []
         self._features = []
+        self._mean_category_number = {}
+        self._category_coefficient = {}
 
     def _read_train_data(self, train_file):
         print('[RankNet] Pre-calculated train file found, reading from external file...')
         start_time = time.clock()
 
         with open(train_file, 'r') as f:
-            for line in f.readlines():
-                parts = line.split(' ')
-                self._labels.append([float(parts[0])])
-                self._features.append([float(feature) for feature in parts[1:]])
+            self._mean_category_number = json.loads(f.readline())
+            self._category_coefficient = json.loads(f.readline())
+            self._labels = json.loads(f.readline())
+            self._features = json.loads(f.readline())
 
         end_time = time.clock()
         print('[RankNet] Training data read in %f seconds.' % (end_time - start_time))
 
     def _write_train_data(self, train_file):
         with open(train_file, 'w') as f:
-            for i in range(0, len(self._labels)):
-                row = []
-                row.extend(self._labels[i])
-                row.extend(self._features[i])
-                f.write(' '.join(row))
+            f.write(json.dumps(self._mean_category_number) + '\n')
+            f.write(json.dumps(self._category_coefficient) + '\n')
+            f.write(json.dumps(self._labels) + '\n')
+            f.write(json.dumps(self._features))
         print('[RankNet] Calculated training data stored into %s.' % train_file)
 
     def _calculate_train_data(self, database):
