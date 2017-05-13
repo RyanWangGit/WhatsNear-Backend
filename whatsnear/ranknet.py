@@ -59,7 +59,6 @@ class RankNet(object):
         return neighbor_categories
 
     def _vectorize_point(self, point, training_category):
-
         neighbor_categories = self._neighbor_categories(point)
 
         x = []
@@ -105,12 +104,24 @@ class RankNet(object):
         for neighbor in potential_neighbors:
             if haversine((float(neighbor[0]), float(neighbor[1])), (float(lat), float(lng))) * 1000 <= r:
                 neighbors.append({
-                    'id': neighbor[4],
-                    'category': neighbor[2],
-                    'checkins': neighbor[3]
+                    'id': neighbor[4]
                 })
 
         return neighbors
+
+    def _expand_neighbors(self, point):
+        for neighbor in point['neighbors']:
+            row = self._conn.execute('''SELECT checkins,category FROM \'Beijing-Checkins\' WHERE id=? LIMIT 1''',
+                                     neighbor['id']).fetchone()[0]
+            neighbor['checkins'] = row[0]
+            neighbor['category'] = row[1]
+
+        return point
+
+    def _release_neighbors(self, point):
+        for neighbor in point['neighbors']:
+            del neighbor['checkins']
+            del neighbor['category']
 
     def _calculate_train_data(self):
         from progress.bar import Bar
@@ -141,8 +152,8 @@ class RankNet(object):
         for row in self._conn.execute('''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\''''):
             self._all_points.append({
                 'id': row[5],
-                'category': row[3],
                 'checkins': row[4],
+                'category': row[3],
                 'neighbors': self._get_neighboring_points(row[0], row[1], row[2], r)
             })
             bar.next()
@@ -150,6 +161,8 @@ class RankNet(object):
 
         # calculate global category parameters
         for outer, _ in categories.items():
+            self._mean_category_number[outer] = {}
+            self._category_coefficient[outer] = {}
             for inner, _ in categories.items():
                 self._mean_category_number[outer][inner] = 0
                 self._category_coefficient[outer][inner] = 0
@@ -157,8 +170,10 @@ class RankNet(object):
         # calculate mean category numbers
         bar = Bar('Calculating mean category numbers', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
         for point in self._all_points:
+            self._expand_neighbors(point)
             for neighbor in point['neighbors']:
                 self._mean_category_number[neighbor['category']][point['category']] += 1
+            self._release_neighbors(point)
 
             bar.next()
 
@@ -190,10 +205,12 @@ class RankNet(object):
         bar = Bar('Calculating features', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
         # calculate features
         for point in self._all_points:
+            self._expand_neighbors(point)
             # add label
             self._labels.append([int(point['checkins'])])
             # add feature
             self._features.append(self._vectorize_point(point, u'生活娱乐'))
+            self._release_neighbors(point)
             bar.next()
 
         bar.finish()
