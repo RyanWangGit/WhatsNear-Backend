@@ -12,8 +12,8 @@ conn = None
 class WhatsNearHandler(tornado.web.RequestHandler):
     def get(self):
         self.add_header('Access-Control-Allow-Origin', '*')
-        self.write('Usage: \n' +
-                   '/query - [[lng, lat], [lng, lat] ...]\n' +
+        self.write('Usage: <br />' +
+                   '/query - [[lng, lat], [lng, lat] ...] <br />' +
                    '/hot')
 
 
@@ -32,6 +32,7 @@ class QueryHandler(tornado.web.RequestHandler):
 
         self.write(json.dumps(result))
 
+
 class HotHandler(tornado.web.RequestHandler):
     def get(self):
         self.add_header('Content-type', 'application/json')
@@ -49,7 +50,7 @@ class HotHandler(tornado.web.RequestHandler):
                 'lat': unicode(row[1]),
                 'name': unicode(row[2]),
                 'address': unicode(row[3]),
-                'checkins': unicode(row[4])
+                'checkins': int(row[4])
             })
         self.write(json.dumps(result))
 
