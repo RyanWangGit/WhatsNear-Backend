@@ -12,7 +12,8 @@ conn = None
 class WhatsNearHandler(tornado.web.RequestHandler):
     def get(self):
         self.write('Usage: \n' +
-                   '/query - [[lng, lat], [lng, lat] ...]')
+                   '/query - [[lng, lat], [lng, lat] ...]\n' +
+                   '/hot')
 
 
 class QueryHandler(tornado.web.RequestHandler):
@@ -54,7 +55,7 @@ def start_server(database, train=None, port=8080):
     conn = sqlite3.connect(database)
 
     # train the model
-    #ranknet.train(database, train)
+    ranknet.train(database, train)
 
     # start hosting the server
     app = tornado.web.Application([
