@@ -55,7 +55,7 @@ class RankNet(object):
         for category, _ in self._categories.items():
             neighbor_categories[category] = 0
         for neighbor in point['neighbors']:
-            neighbor_categories[neighbor['category']] += 1
+            neighbor_categories[unicode(neighbor['category'])] += 1
         return neighbor_categories
 
     def _vectorize_point(self, point, training_category):
@@ -104,7 +104,7 @@ class RankNet(object):
         for neighbor in potential_neighbors:
             if haversine((float(neighbor[0]), float(neighbor[1])), (float(lat), float(lng))) * 1000 <= r:
                 neighbors.append({
-                    'id': neighbor[4]
+                    'id': unicode(neighbor[4])
                 })
 
         return neighbors
@@ -112,9 +112,9 @@ class RankNet(object):
     def _expand_neighbors(self, point):
         for neighbor in point['neighbors']:
             row = self._conn.execute('''SELECT checkins,category FROM \'Beijing-Checkins\' WHERE id=? LIMIT 1''',
-                                     neighbor['id']).fetchone()[0]
-            neighbor['checkins'] = row[0]
-            neighbor['category'] = row[1]
+                                     unicode(neighbor['id'])).fetchone()[0]
+            neighbor['checkins'] = unicode(row[0])
+            neighbor['category'] = unicode(row[1])
 
         return point
 
@@ -145,15 +145,15 @@ class RankNet(object):
         total_num = int(self._conn.execute('''SELECT COUNT(*) FROM \'Beijing-Checkins\'''').fetchone()[0])
         categories = {}
         for row in self._conn.execute('''SELECT category, COUNT(*) AS num FROM "Beijing-Checkins" GROUP BY category'''):
-            categories[row[0]] = int(row[1])
+            categories[unicode(row[0])] = int(row[1])
 
         # calculate and store the neighboring points
         bar = Bar('Calculating neighbors', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
         for row in self._conn.execute('''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\''''):
             self._all_points.append({
-                'id': row[5],
-                'checkins': row[4],
-                'category': row[3],
+                'id': unicode(row[5]),
+                'checkins': unicode(row[4]),
+                'category': unicode(row[3]),
                 'neighbors': self._get_neighboring_points(row[0], row[1], row[2], r)
             })
             bar.next()
