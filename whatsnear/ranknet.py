@@ -55,7 +55,7 @@ class RankNet(object):
         for category, _ in self._categories.items():
             neighbor_categories[category] = 0
         for neighbor in point['neighbors']:
-            neighbor_categories[unicode(neighbor['category'])] += 1
+            neighbor_categories[neighbor['category']] += 1
         return neighbor_categories
 
     def _vectorize_point(self, point, training_category):
@@ -69,7 +69,9 @@ class RankNet(object):
         # neighbors entropy
         entropy = 0
         for (key, value) in neighbor_categories.items():
-            entropy += float(value) / len(point['neighbors']) * -1 * math.log(float(value) / len(point['neighbors']), 10)
+            if value == 0:
+                continue
+            entropy += (float(value) / len(point['neighbors'])) * -1 * math.log(float(value) / len(point['neighbors']))
 
         x.append(entropy)
 
@@ -83,6 +85,8 @@ class RankNet(object):
         # quality by jensen
         jenson_quality = 0
         for category, _ in self._categories.items():
+            if self._category_coefficient[category][training_category] == 0:
+                continue
             jenson_quality += math.log(self._category_coefficient[category][training_category]) * (
             neighbor_categories[category] - self._mean_category_number[category][training_category])
 
@@ -104,7 +108,7 @@ class RankNet(object):
         for neighbor in potential_neighbors:
             if haversine((float(neighbor[0]), float(neighbor[1])), (float(lat), float(lng))) * 1000 <= r:
                 neighbors.append({
-                    'id': unicode(neighbor[4])
+                    'id': int(neighbor[4])
                 })
 
         return neighbors
@@ -112,8 +116,8 @@ class RankNet(object):
     def _expand_neighbors(self, point):
         for neighbor in point['neighbors']:
             row = self._conn.execute('''SELECT checkins,category FROM \'Beijing-Checkins\' WHERE id=? LIMIT 1''',
-                                     unicode(neighbor['id'])).fetchone()[0]
-            neighbor['checkins'] = unicode(row[0])
+                                     (neighbor['id'],)).fetchone()
+            neighbor['checkins'] = int(row[0])
             neighbor['category'] = unicode(row[1])
 
         return point
@@ -142,28 +146,28 @@ class RankNet(object):
         r = 200
 
         # calculate global parameters
-        total_num = int(self._conn.execute('''SELECT COUNT(*) FROM \'Beijing-Checkins\'''').fetchone()[0])
-        categories = {}
+        #total_num = int(self._conn.execute('''SELECT COUNT(*) FROM \'Beijing-Checkins\' ''').fetchone()[0])
+        total_num = 10000
         for row in self._conn.execute('''SELECT category, COUNT(*) AS num FROM "Beijing-Checkins" GROUP BY category'''):
-            categories[unicode(row[0])] = int(row[1])
+            self._categories[unicode(row[0])] = int(row[1])
 
         # calculate and store the neighboring points
         bar = Bar('Calculating neighbors', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
-        for row in self._conn.execute('''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\''''):
+        for row in self._conn.execute('''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\' LIMIT 10000'''):
             self._all_points.append({
-                'id': unicode(row[5]),
-                'checkins': unicode(row[4]),
+                'id': int(row[5]),
+                'checkins': int(row[4]),
                 'category': unicode(row[3]),
-                'neighbors': self._get_neighboring_points(row[0], row[1], row[2], r)
+                'neighbors': self._get_neighboring_points(float(row[0]), float(row[1]), unicode(row[2]), r)
             })
             bar.next()
         bar.finish()
 
         # calculate global category parameters
-        for outer, _ in categories.items():
+        for outer, _ in self._categories.items():
             self._mean_category_number[outer] = {}
             self._category_coefficient[outer] = {}
-            for inner, _ in categories.items():
+            for inner, _ in self._categories.items():
                 self._mean_category_number[outer][inner] = 0
                 self._category_coefficient[outer][inner] = 0
 
@@ -177,24 +181,30 @@ class RankNet(object):
 
             bar.next()
 
-        for p, _ in categories.items():
-            for l, _ in categories.items():
-                self._mean_category_number[p][l] /= categories[l]
+        for p, _ in self._categories.items():
+            for l, _ in self._categories.items():
+                self._mean_category_number[p][l] /= self._categories[l]
 
         bar.finish()
 
         # calculate category coefficients
-        bar = Bar('Calculating category coefficients', suffix='%(index)d / %(max)d, %(percent)d%%', max=len(categories) * len(categories))
-        for p, _ in categories.items():
-            for l, _ in categories.items():
-                k_prefix = float(total_num - categories[p]) / (categories[p] * categories[l])
+        bar = Bar('Calculating category coefficients', suffix='%(index)d / %(max)d, %(percent)d%%', max=len(self._categories) * len(self._categories))
+        for p, _ in self._categories.items():
+            for l, _ in self._categories.items():
+
+                k_prefix = float(total_num - self._categories[p]) / (self._categories[p] * self._categories[l])
 
                 k_suffix = 0
                 for pt in self._all_points:
                     if pt['category'] == p:
+                        self._expand_neighbors(pt)
                         neighbor_categories = self._neighbor_categories(pt)
 
+                        if len(pt['neighbors']) - neighbor_categories[p] == 0:
+                            continue
+
                         k_suffix += float(neighbor_categories[l]) / (len(pt['neighbors']) - neighbor_categories[p])
+                        self._release_neighbors(pt)
 
                 self._category_coefficient[p][l] = k_prefix * k_suffix
 
