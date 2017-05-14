@@ -11,6 +11,7 @@ conn = None
 
 class WhatsNearHandler(tornado.web.RequestHandler):
     def get(self):
+        self.add_header('Access-Control-Allow-Origin', '*')
         self.write('Usage: \n' +
                    '/query - [[lng, lat], [lng, lat] ...]\n' +
                    '/hot')
@@ -20,6 +21,7 @@ class QueryHandler(tornado.web.RequestHandler):
     def get(self):
         query_points = json.loads(self.get_argument('points'))
         self.add_header('Content-type', 'application/json')
+        self.add_header('Access-Control-Allow-Origin', '*')
 
         result = []
         for point in ranknet.rank(query_points, self):
@@ -33,14 +35,16 @@ class QueryHandler(tornado.web.RequestHandler):
 class HotHandler(tornado.web.RequestHandler):
     def get(self):
         self.add_header('Content-type', 'application/json')
+        self.add_header('Access-Control-Allow-Origin', '*')
 
         result = []
         cursor = conn.cursor()
         cursor.execute(
-            '''SELECT lng,lat,name,address,checkins FROM 'Beijing-Checkins' WHERE category='生活娱乐' AND checkins > 0 ORDER BY checkins DESC LIMIT 1000''')
+            '''SELECT lng,lat,name,address,checkins,id FROM 'Beijing-Checkins' WHERE category='生活娱乐' AND checkins > 0 ORDER BY checkins DESC LIMIT 1000''')
 
         for row in cursor.fetchall():
             result.append({
+                'id': unicode(row[5]),
                 'lng': unicode(row[0]),
                 'lat': unicode(row[1]),
                 'name': unicode(row[2]),
@@ -50,7 +54,7 @@ class HotHandler(tornado.web.RequestHandler):
         self.write(json.dumps(result))
 
 
-def start_server(database, train=None, port=8080):
+def start_server(database, train=None, ip='127.0.0.1', port=8080):
     global conn
     conn = sqlite3.connect(database)
 
@@ -64,7 +68,6 @@ def start_server(database, train=None, port=8080):
         ('/hot', HotHandler)
     ])
 
-    ip = '127.0.0.1'
     app.listen(port, ip)
     print('[WhatsNear] Start hosting at http://%s:%d.' % (ip, port))
     tornado.ioloop.IOLoop.current().start()

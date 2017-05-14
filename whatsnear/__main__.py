@@ -17,7 +17,10 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--train',
                         action='store', dest='train', type=str,
                         help='The training matrix file to read from.', required=False)
+    parser.add_argument('-i', '--ip',
+                        action='store', dest='ip', type=str,
+                        help='The ip to bind on.', required=False)
     results = parser.parse_args()
 
     # start server
-    whatsnear.start_server(results.sqlite, results.train, results.port)
+    whatsnear.start_server(results.sqlite, results.train, results.ip, results.port)
