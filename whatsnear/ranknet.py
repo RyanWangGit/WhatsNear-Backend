@@ -1,9 +1,7 @@
 # coding=utf-8
 import tensorflow as tf
 import numpy as np
-import sqlite3
-from haversine import haversine
-import geohash
+from database import Database
 import json
 import math
 import random
@@ -19,8 +17,7 @@ class RankNet(object):
         self._labels = []
         self._features = []
         self._is_ready = False
-        self._database = ''
-        self._conn = None
+        self._database = None
 
         # global parameters
         self._mean_category_number = {}
@@ -96,36 +93,7 @@ class RankNet(object):
             popularity += int(neighbor['checkins'])
 
         x.append(popularity)
-
-    def _get_neighboring_points(self, lng, lat, geo_hash, r):
-        neighbors = []
-        potential_neighbors = []
-
-        for point in self._conn.execute('''SELECT lat,lng,category,checkins,id FROM \'Beijing-Checkins\' 
-                                                             WHERE geohash LIKE \'%s%%\'''' % geo_hash[:6]):
-            potential_neighbors.append(point)
-
-        for neighbor in potential_neighbors:
-            if haversine((float(neighbor[0]), float(neighbor[1])), (float(lat), float(lng))) * 1000 <= r:
-                neighbors.append({
-                    'id': int(neighbor[4])
-                })
-
-        return neighbors
-
-    def _expand_neighbors(self, point):
-        for neighbor in point['neighbors']:
-            row = self._conn.execute('''SELECT checkins,category FROM \'Beijing-Checkins\' WHERE id=? LIMIT 1''',
-                                     (neighbor['id'],)).fetchone()
-            neighbor['checkins'] = int(row[0])
-            neighbor['category'] = unicode(row[1])
-
-        return point
-
-    def _release_neighbors(self, point):
-        for neighbor in point['neighbors']:
-            del neighbor['checkins']
-            del neighbor['category']
+        return x
 
     def _calculate_train_data(self):
         from progress.bar import Bar
@@ -133,32 +101,24 @@ class RankNet(object):
         print('[RankNet] Pre-calculated train file not found, calculating training data...')
         start_time = time.clock()
 
-        c = self._conn.cursor()
-        # if geohash has never been calculated
-        if c.execute('''SELECT geohash FROM \'Beijing-Checkins\' LIMIT 1''').fetchone()[0] is None:
-            # calculate the geohash value and store in database
-            for row in c.execute('''SELECT id,lng,lat FROM \'Beijing-Checkins\''''):
-                self._conn.execute('''UPDATE \'Beijing-Checkins\' set geohash=? WHERE id=?''',
-                             (geohash.encode(float(row[2]), float(row[1])), row[0]))
-            self._conn.commit()
+        self._database.update_geohash()
 
         # radius to calculate features
         r = 200
 
         # calculate global parameters
-        #total_num = int(self._conn.execute('''SELECT COUNT(*) FROM \'Beijing-Checkins\' ''').fetchone()[0])
+        #total_num = self._database.get_total_num()
         total_num = 10000
-        for row in self._conn.execute('''SELECT category, COUNT(*) AS num FROM "Beijing-Checkins" GROUP BY category'''):
-            self._categories[unicode(row[0])] = int(row[1])
+        self._categories = self._database.get_categories()
 
         # calculate and store the neighboring points
         bar = Bar('Calculating neighbors', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
-        for row in self._conn.execute('''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\' LIMIT 10000'''):
+        for row in self._database.get_connection().execute('''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\' LIMIT 10000'''):
             self._all_points.append({
                 'id': int(row[5]),
                 'checkins': int(row[4]),
                 'category': unicode(row[3]),
-                'neighbors': self._get_neighboring_points(float(row[0]), float(row[1]), unicode(row[2]), r)
+                'neighbors': self._database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
             })
             bar.next()
         bar.finish()
@@ -174,10 +134,10 @@ class RankNet(object):
         # calculate mean category numbers
         bar = Bar('Calculating mean category numbers', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
         for point in self._all_points:
-            self._expand_neighbors(point)
+            self._database.expand_neighbors(point)
             for neighbor in point['neighbors']:
                 self._mean_category_number[neighbor['category']][point['category']] += 1
-            self._release_neighbors(point)
+            self._database.release_neighbors(point)
 
             bar.next()
 
@@ -197,14 +157,14 @@ class RankNet(object):
                 k_suffix = 0
                 for pt in self._all_points:
                     if pt['category'] == p:
-                        self._expand_neighbors(pt)
+                        self._database.expand_neighbors(pt)
                         neighbor_categories = self._neighbor_categories(pt)
 
                         if len(pt['neighbors']) - neighbor_categories[p] == 0:
                             continue
 
                         k_suffix += float(neighbor_categories[l]) / (len(pt['neighbors']) - neighbor_categories[p])
-                        self._release_neighbors(pt)
+                        self._database.release_neighbors(pt)
 
                 self._category_coefficient[p][l] = k_prefix * k_suffix
 
@@ -215,12 +175,12 @@ class RankNet(object):
         bar = Bar('Calculating features', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
         # calculate features
         for point in self._all_points:
-            self._expand_neighbors(point)
+            self._database.expand_neighbors(point)
             # add label
             self._labels.append([int(point['checkins'])])
             # add feature
             self._features.append(self._vectorize_point(point, u'生活娱乐'))
-            self._release_neighbors(point)
+            self._database.release_neighbors(point)
             bar.next()
 
         bar.finish()
@@ -260,8 +220,7 @@ class RankNet(object):
 
     def train(self, database, train_file):
         # open database connection
-        self._database = database
-        self._conn = sqlite3.connect(database)
+        self._database = Database(database)
 
         if train_file is None or not os.path.exists(train_file):
             self._calculate_train_data()
@@ -351,10 +310,17 @@ class RankNet(object):
     def rank(self, query_points, caller):
         print('[TensorFlow - 0x%x] Start ranking the query points with size %d.' % (id(caller), len(query_points)))
         for point in query_points:
-            x = self._vectorize_point(point)
+            x = self._vectorize_point(point, u'生活娱乐')
             # TODO: calculate the score with x
             score = 0
-            point.append(score)
+
+            point['score'] = score
+            point['density'] = x[0]
+            point['entropy'] = x[1]
+            point['competitiveness'] = x[2]
+            point['jenson'] = x[3]
+            point['popularity'] = x[4]
+
         print('[TensorFlow - 0x%x] Ranking finished.' % id(caller))
 
         return query_points
