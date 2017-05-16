@@ -41,13 +41,15 @@ class Database(object):
 
         return neighbors
 
-    def get_info(self, point):
-        row = self._conn.execute('''SELECT lng,lat,name,address FROM \'Beijing-Checkins\' WHERE id=? LIMIT 1''',
+    def expand_info(self, point):
+        row = self._conn.execute('''SELECT lng,lat,name,address,category,checkins FROM \'Beijing-Checkins\' WHERE id=? LIMIT 1''',
                            (point['id'],)).fetchone()
         point['lng'] = float(row[0])
         point['lat'] = float(row[1])
         point['name'] = unicode(row[2])
         point['address'] = unicode(row[3])
+        point['category'] = unicode(row[4])
+        point['checkins'] = int(row[5])
         return point
 
     def update_geohash(self):
