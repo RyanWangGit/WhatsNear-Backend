@@ -32,17 +32,14 @@ class QueryHandler(tornado.web.RequestHandler):
                 'lat': point[1],
                 'neighbors': conn.get_neighboring_points(point[0], point[1], 200)
             }
-            conn.expand_neighbors(new_point)
+            for neighbor in new_point['neighbors']:
+                conn.expand_info(neighbor)
+
             points.append(new_point)
 
-        result = []
-        for point in ranknet.rank(points, self):
-            result.append({
-                'lnglat': point,
-                'neighbors': []
-            })
+        ranknet.rank(points, self)
 
-        self.write(json.dumps(result))
+        self.write(json.dumps(points))
 
 
 class HotHandler(tornado.web.RequestHandler):
