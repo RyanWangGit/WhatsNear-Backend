@@ -2,8 +2,8 @@
 import tornado.ioloop
 import tornado.web
 import json
-import sqlite3
 from ranknet import RankNet
+from database import Database
 
 # global ranknet object
 ranknet = RankNet()
@@ -14,7 +14,8 @@ class WhatsNearHandler(tornado.web.RequestHandler):
         self.add_header('Access-Control-Allow-Origin', '*')
         self.write('Usage: <br />' +
                    '/query - [[lng, lat], [lng, lat] ...] <br />' +
-                   '/hot')
+                   '/hot <br />' +
+                   '/neighbor [lng, lat]')
 
 
 class QueryHandler(tornado.web.RequestHandler):
@@ -23,11 +24,22 @@ class QueryHandler(tornado.web.RequestHandler):
         self.add_header('Content-type', 'application/json')
         self.add_header('Access-Control-Allow-Origin', '*')
 
+        # pre-process the points
+        points = []
+        for point in query_points:
+            new_point = {
+                'lng': point[0],
+                'lat': point[1],
+                'neighbors': conn.get_neighboring_points(point[0], point[1], 200)
+            }
+            conn.expand_neighbors(new_point)
+            points.append(new_point)
+
         result = []
-        for point in ranknet.rank(query_points, self):
+        for point in ranknet.rank(points, self):
             result.append({
                 'lnglat': point,
-                'surroundings': []
+                'neighbors': []
             })
 
         self.write(json.dumps(result))
@@ -39,7 +51,7 @@ class HotHandler(tornado.web.RequestHandler):
         self.add_header('Access-Control-Allow-Origin', '*')
 
         result = []
-        cursor = conn.cursor()
+        cursor = conn.get_connection().cursor()
         cursor.execute(
             '''SELECT lng,lat,name,address,checkins,id FROM 'Beijing-Checkins' WHERE category='生活娱乐' AND checkins > 0 ORDER BY checkins DESC LIMIT 1000''')
 
@@ -55,18 +67,34 @@ class HotHandler(tornado.web.RequestHandler):
         self.write(json.dumps(result))
 
 
+class NeighborHandler(tornado.web.RequestHandler):
+    def get(self):
+        self.add_header('Content-type', 'application/json')
+        self.add_header('Access-Control-Allow-Origin', '*')
+
+        lng, lat = json.loads(self.get_argument('point'))
+        neighbors = conn.get_neighboring_points(lng, lat, 200)
+
+        results = []
+        for neighbor in neighbors:
+            results.append(conn.get_info(neighbor))
+
+        self.write(json.dumps(results))
+
+
 def start_server(database, train=None, ip='127.0.0.1', port=8080):
     global conn
-    conn = sqlite3.connect(database)
+    conn = Database(database)
 
     # train the model
-    ranknet.train(database, train)
+    #ranknet.train(database, train)
 
     # start hosting the server
     app = tornado.web.Application([
         ('/', WhatsNearHandler),
         ('/query', QueryHandler),
-        ('/hot', HotHandler)
+        ('/hot', HotHandler),
+        ('/neighbor', NeighborHandler)
     ])
 
     app.listen(port, ip)
