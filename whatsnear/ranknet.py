@@ -32,6 +32,7 @@ class RankNet(object):
         with open(train_file, 'r') as f:
             self._mean_category_number = json.loads(f.readline())
             self._category_coefficient = json.loads(f.readline())
+            self._categories = json.loads(f.readline())
             self._labels = json.loads(f.readline())
             self._features = json.loads(f.readline())
 
@@ -42,6 +43,7 @@ class RankNet(object):
         with open(train_file, 'w') as f:
             f.write(json.dumps(self._mean_category_number) + '\n')
             f.write(json.dumps(self._category_coefficient) + '\n')
+            f.write(json.dumps(self._categories) + '\n')
             f.write(json.dumps(self._labels) + '\n')
             f.write(json.dumps(self._features))
         print('[RankNet] Calculated training data stored into %s.' % train_file)
