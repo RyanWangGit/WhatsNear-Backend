@@ -18,7 +18,7 @@ if __name__ == '__main__':
                         action='store', dest='train', type=str,
                         help='The training matrix file to read from.', required=False)
     parser.add_argument('-i', '--ip',
-                        action='store', dest='ip', type=str,
+                        action='store', dest='ip', default='127.0.0.1', type=str,
                         help='The ip to bind on.', required=False)
     results = parser.parse_args()
 
