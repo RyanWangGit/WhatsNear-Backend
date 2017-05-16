@@ -86,8 +86,11 @@ class RankNet(object):
         for category, _ in self._categories.items():
             if self._category_coefficient[category][training_category] == 0:
                 continue
+
             jenson_quality += math.log(self._category_coefficient[category][training_category]) * (
             neighbor_categories[category] - self._mean_category_number[category][training_category])
+
+        x.append(jenson_quality)
 
         # area popularity
         popularity = 0
@@ -145,6 +148,9 @@ class RankNet(object):
 
         for p, _ in self._categories.items():
             for l, _ in self._categories.items():
+                # TODO: to delete this line of code when we run training in full dataset
+                if self._categories[l] == 0:
+                    continue
                 self._mean_category_number[p][l] /= self._categories[l]
 
         bar.finish()
@@ -153,6 +159,9 @@ class RankNet(object):
         bar = Bar('Calculating category coefficients', suffix='%(index)d / %(max)d, %(percent)d%%', max=len(self._categories) * len(self._categories))
         for p, _ in self._categories.items():
             for l, _ in self._categories.items():
+                # TODO: delete this line of code in full dataset
+                if self._categories[p] * self._categories[l] == 0:
+                    continue
 
                 k_prefix = float(total_num - self._categories[p]) / (self._categories[p] * self._categories[l])
 
@@ -191,7 +200,7 @@ class RankNet(object):
         print('[RankNet] Training data calculated in %f seconds.' % (end_time - start_time))
 
         # store calculated train data
-        self._write_train_data(os.path.dirname(self._database) + '/train.txt')
+        self._write_train_data(os.path.dirname(self._database.get_file_path()) + '/train.txt')
 
     def get_train_data(self, batch_size=32):
         # generate data with 10 dimensions

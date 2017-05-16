@@ -5,13 +5,17 @@ from haversine import haversine
 
 class Database(object):
     def __init__(self, database):
+        self._file_path = database
         self._conn = sqlite3.connect(database)
         self._total_num = 0
         self._categories = {}
+        self._get_globals()
 
     def _get_globals(self):
         self._total_num = int(self._conn.execute('''SELECT COUNT(*) FROM \'Beijing-Checkins\' ''').fetchone()[0])
         for row in self._conn.execute('''SELECT category, COUNT(*) AS num FROM "Beijing-Checkins" GROUP BY category'''):
+            self._categories[unicode(row[0])] = 0
+        for row in self._conn.execute('''SELECT category, COUNT(*) AS num FROM (SELECT category FROM "Beijing-CHeckins" LIMIT 10000) GROUP BY category'''):
             self._categories[unicode(row[0])] = int(row[1])
 
     def get_total_num(self):
@@ -72,4 +76,7 @@ class Database(object):
 
     def get_connection(self):
         return self._conn
+
+    def get_file_path(self):
+        return self._file_path
 
