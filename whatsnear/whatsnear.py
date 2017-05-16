@@ -87,7 +87,7 @@ def start_server(database, train=None, ip='127.0.0.1', port=8080):
     conn = Database(database)
 
     # train the model
-    #ranknet.train(database, train)
+    ranknet.train(database, train)
 
     # start hosting the server
     app = tornado.web.Application([
