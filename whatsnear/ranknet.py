@@ -1,6 +1,5 @@
 # coding=utf-8
 import tensorflow as tf
-import numpy as np
 from database import Database
 import json
 import math
@@ -8,12 +7,12 @@ import random
 import time
 import os
 
-feature_num = 10
-h1_num = 10
+
 
 
 class RankNet(object):
     def __init__(self):
+        # training data
         self._labels = []
         self._features = []
         self._is_ready = False
@@ -24,6 +23,9 @@ class RankNet(object):
         self._category_coefficient = {}
         self._categories = {}
         self._all_points = []
+
+        # score function
+        self._score_function = None
 
     def _read_train_data(self, train_file):
         print('[RankNet] Pre-calculated train file found, reading from external file...')
@@ -203,6 +205,8 @@ class RankNet(object):
         self._write_train_data(os.path.dirname(self._database.get_file_path()) + '/train.txt')
 
     def get_train_data(self, batch_size=32):
+        import numpy as np
+
         # generate data with 10 dimensions
         X1, X2 = [], []
         Y1, Y2 = [], []
@@ -229,17 +233,10 @@ class RankNet(object):
 
         return (np.array(X1), np.array(X2)), (np.array(Y1), np.array(Y2))
 
-    def train(self, database, train_file):
-        # open database connection
-        self._database = Database(database)
+    def _tf_train_model(self):
 
-        if train_file is None or not os.path.exists(train_file):
-            self._calculate_train_data()
-        else:
-            self._read_train_data(train_file)
-
-        print('[TensorFlow] Start training model...')
-        start_time = time.clock()
+        feature_num = 10
+        h1_num = 10
 
         with tf.name_scope("input"):
             x1 = tf.placeholder(tf.float32, [None, feature_num], name="x1")
@@ -248,7 +245,7 @@ class RankNet(object):
             o1 = tf.placeholder(tf.float32, [None, 1], name="o1")
             o2 = tf.placeholder(tf.float32, [None, 1], name="o2")
 
-        # add layer1
+            # add layer1
         with tf.name_scope("layer1"):
             with tf.name_scope("w1"):
                 w1 = tf.Variable(tf.random_normal([feature_num, h1_num]), name="w1")
@@ -266,7 +263,7 @@ class RankNet(object):
                 h1_o2 = tf.matmul(x2, w1) + b1
                 # tf.summary.histogram("h2_o1", h1_o2)
 
-        # add output layer
+                # add output layer
         with tf.name_scope("output"):
             with tf.name_scope("w2"):
                 w2 = tf.Variable(tf.random_normal([h1_num, 1]), name="w2")
@@ -279,7 +276,7 @@ class RankNet(object):
             h2_o1 = tf.matmul(h1_o1, w2) + b2
             h2_o2 = tf.matmul(h1_o2, w2) + b2
 
-        # calculate probability based on output layer
+            # calculate probability based on output layer
         with tf.name_scope("loss"):
             o12 = o1 - o2
             h_o12 = h2_o1 - h2_o2
@@ -309,28 +306,124 @@ class RankNet(object):
                     l_v = sess.run(loss, feed_dict={x1: X[0], x2: X[1], o1: Y[0], o2: Y[1]})
                     h_o12_v = sess.run(h_o12, feed_dict={x1: X[0], x2: X[1], o1: Y[0], o2: Y[1]})
                     o12_v = sess.run(o12, feed_dict={x1: X[0], x2: X[1], o1: Y[0], o2: Y[1]})
-                    #print "------ epoch[%d] loss_v[%f] ------ " % (epoch, l_v)
-                    #for k in range(0, len(o12_v)):
-                        #print "k[%d] o12_v[%f] h_o12_v[%f]" % (k, o12_v[k], h_o12_v[k])
+                    # print "------ epoch[%d] loss_v[%f] ------ " % (epoch, l_v)
+                    # for k in range(0, len(o12_v)):
+                    # print "k[%d] o12_v[%f] h_o12_v[%f]" % (k, o12_v[k], h_o12_v[k])
+
+    def _keras_train_model(self, features, labels, epochs=100, batches=10):
+        # Michael A. Alcorn (malcorn@redhat.com)
+        # A (slightly modified) implementation of RankNet as described in [1].
+        #   [1] http://icml.cc/2015/wp-content/uploads/2015/06/icml_ranking.pdf
+        #   [2] https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/MSR-TR-2010-82.pdf
+        import numpy as np
+
+        from keras import backend
+        from keras.layers import Activation, Add, Dense, Input, Lambda
+        from keras.models import Model
+
+        dimension = len(features[0])
+
+        # Model.
+        h_1 = Dense(128, activation="relu")
+        h_2 = Dense(64, activation="relu")
+        h_3 = Dense(32, activation="relu")
+        s = Dense(1)
+
+        # Relevant document score.
+        rel_doc = Input(shape=(dimension,), dtype="float32")
+        h_1_rel = h_1(rel_doc)
+        h_2_rel = h_2(h_1_rel)
+        h_3_rel = h_3(h_2_rel)
+        rel_score = s(h_3_rel)
+
+        # Irrelevant document score.
+        irr_doc = Input(shape=(dimension,), dtype="float32")
+        h_1_irr = h_1(irr_doc)
+        h_2_irr = h_2(h_1_irr)
+        h_3_irr = h_3(h_2_irr)
+        irr_score = s(h_3_irr)
+
+        # Subtract scores.
+        negated_irr_score = Lambda(lambda x: -1 * x, output_shape=(1,))(irr_score)
+        diff = Add()([rel_score, negated_irr_score])
+
+        # Pass difference through sigmoid function.
+        prob = Activation("sigmoid")(diff)
+
+        # Build model.
+        model = Model(inputs=[rel_doc, irr_doc], outputs=prob)
+        model.compile(optimizer="adadelta", loss="binary_crossentropy")
+
+        # Fake data.
+        x1 = []
+        x2 = []
+        indexes = xrange(len(features))
+        for i in xrange(len(features) * 10):
+            index1, index2 = random.sample(indexes, 2)
+
+            if labels[index1] > labels[index2]:
+                x1.append(features[index1])
+                x2.append(features[index2])
+            else:
+                x1.append(features[index2])
+                x2.append(features[index1])
+
+        X1 = np.matrix(x1)
+        X2 = np.matrix(x2)
+        y = np.ones((X1.shape[0], 1))
+
+        # Train model.
+        history = model.fit([X1, X2], y, batch_size=batches, epochs=epochs, verbose=1)
+
+        # Generate scores from document/query features.
+        self._score_function = backend.function([rel_doc], [rel_score])
+
+    def train(self, database, train_file, epochs=1000, batches=10):
+        # open database connection
+        self._database = Database(database)
+
+        if train_file is None or not os.path.exists(train_file):
+            self._calculate_train_data()
+        else:
+            self._read_train_data(train_file)
+
+        print('[TensorFlow] Start training model...')
+        start_time = time.clock()
+
+        self._keras_train_model(self._features, self._labels, epochs=epochs, batches=batches)
 
         end_time = time.clock()
+
+        self._is_ready = True
 
         print '[TensorFlow] Model trained in %f seconds' % (end_time - start_time)
         return
 
     def rank(self, query_points, caller):
+        if not self._is_ready:
+            print('[TensorFlow - 0x%x] Ranker isn\'t ready, train the model or load the pre-trained model first.' % id(caller))
+            return None
+
         print('[TensorFlow - 0x%x] Start ranking the query points with size %d.' % (id(caller), len(query_points)))
+
+        features = []
         for point in query_points:
             x = self._vectorize_point(point, u'生活娱乐')
-            # TODO: calculate the score with x
-            score = 0
+            features.append(x)
 
-            point['score'] = score
             point['density'] = x[0]
             point['entropy'] = x[1]
             point['competitiveness'] = x[2]
             point['jenson'] = x[3]
             point['popularity'] = x[4]
+
+        labels = self._score_function([features])[0]
+
+        print(len(labels))
+        for i in range(len(labels)):
+            query_points[i]['score'] = float(labels[i][0])
+
+        query_points.sort(key=lambda p: p['score'], reverse=True)
 
         print('[TensorFlow - 0x%x] Ranking finished.' % id(caller))
 
