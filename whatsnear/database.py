@@ -14,9 +14,9 @@ class Database(object):
     def _get_globals(self):
         self._total_num = int(self._conn.execute('''SELECT COUNT(*) FROM \'Beijing-Checkins\' ''').fetchone()[0])
         for row in self._conn.execute('''SELECT category, COUNT(*) AS num FROM "Beijing-Checkins" GROUP BY category'''):
-            self._categories[unicode(row[0])] = 0
-        for row in self._conn.execute('''SELECT category, COUNT(*) AS num FROM (SELECT category FROM "Beijing-CHeckins" LIMIT 10000) GROUP BY category'''):
             self._categories[unicode(row[0])] = int(row[1])
+        #for row in self._conn.execute('''SELECT category, COUNT(*) AS num FROM (SELECT category FROM "Beijing-CHeckins" LIMIT 10000) GROUP BY category'''):
+            #self._categories[unicode(row[0])] = int(row[1])
 
     def get_total_num(self):
         return self._total_num
@@ -36,7 +36,11 @@ class Database(object):
         for neighbor in potential_neighbors:
             if haversine((float(neighbor[0]), float(neighbor[1])), (float(lat), float(lng))) * 1000 <= r:
                 neighbors.append({
-                    'id': int(neighbor[4])
+                    'id': int(neighbor[4]),
+                    'lat': float(neighbor[0]),
+                    'lng': float(neighbor[1]),
+                    'category': unicode(neighbor[2]),
+                    'checkins': int(neighbor[3])
                 })
 
         return neighbors
