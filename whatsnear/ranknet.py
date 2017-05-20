@@ -5,10 +5,10 @@ import time
 
 
 class RankNet(object):
-    def __init__(self, dataset):
+    def __init__(self):
         # training data
+        self._dataset = None
         self._is_ready = False
-        self._dataset = dataset
 
         # model
         self._model = None
@@ -207,6 +207,7 @@ class RankNet(object):
     def train(self, dataset, epochs=1000, batches=10):
         print('[TensorFlow] Start training model...')
         start_time = time.clock()
+        self._dataset = dataset
         self._keras_train_model(dataset.get_features(), dataset.get_labels(), epochs=epochs, batches=batches)
         self._is_ready = True
         end_time = time.clock()
@@ -221,7 +222,7 @@ class RankNet(object):
 
         features = []
         for point in query_points:
-            x = self._vectorize_point(point['neighbors'], u'生活娱乐')
+            x = self._dataset.vectorize_point(point['neighbors'], u'生活娱乐')
             features.append(x)
 
             point['density'] = x[0]
