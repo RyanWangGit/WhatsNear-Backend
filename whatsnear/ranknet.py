@@ -8,8 +8,6 @@ import time
 import os
 
 
-
-
 class RankNet(object):
     def __init__(self):
         # training data
@@ -23,6 +21,9 @@ class RankNet(object):
         self._category_coefficient = {}
         self._categories = {}
         self._all_points = []
+
+        # model
+        self._model = None
 
         # score function
         self._score_function = None
@@ -50,36 +51,36 @@ class RankNet(object):
             f.write(json.dumps(self._features))
         print('[RankNet] Calculated training data stored into %s.' % train_file)
 
-    def _neighbor_categories(self, point):
+    def _neighbor_categories(self, neighbors):
         # calculate sub-global parameters
         neighbor_categories = {}
         for category, _ in self._categories.items():
             neighbor_categories[category] = 0
-        for neighbor in point['neighbors']:
+        for neighbor in neighbors:
             neighbor_categories[neighbor['category']] += 1
         return neighbor_categories
 
-    def _vectorize_point(self, point, training_category):
-        neighbor_categories = self._neighbor_categories(point)
+    def _vectorize_point(self, neighbors, training_category):
+        neighbor_categories = self._neighbor_categories(neighbors)
 
         x = []
 
         # density
-        x.append(len(point['neighbors']))
+        x.append(len(neighbors))
 
         # neighbors entropy
         entropy = 0
         for (key, value) in neighbor_categories.items():
             if value == 0:
                 continue
-            entropy += (float(value) / len(point['neighbors'])) * -1 * math.log(float(value) / len(point['neighbors']))
+            entropy += (float(value) / len(neighbors)) * -1 * math.log(float(value) / len(neighbors))
 
         x.append(entropy)
 
         # competitiveness
         competitiveness = 0
         if training_category in neighbor_categories:
-            competitiveness = -1 * float(neighbor_categories[training_category]) / len(point['neighbors'])
+            competitiveness = -1 * float(neighbor_categories[training_category]) / len(neighbors)
 
         x.append(competitiveness)
 
@@ -96,7 +97,7 @@ class RankNet(object):
 
         # area popularity
         popularity = 0
-        for neighbor in point['neighbors']:
+        for neighbor in neighbors:
             popularity += int(neighbor['checkins'])
 
         x.append(popularity)
@@ -114,21 +115,23 @@ class RankNet(object):
         r = 200
 
         # calculate global parameters
-        #total_num = self._database.get_total_num()
-        total_num = 10000
+        total_num = self._database.get_total_num()
+        #total_num = 10000
         self._categories = self._database.get_categories()
 
         # calculate and store the neighboring points
-        bar = Bar('Calculating neighbors', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
-        for row in self._database.get_connection().execute('''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\' LIMIT 10000'''):
-            self._all_points.append({
-                'id': int(row[5]),
-                'checkins': int(row[4]),
-                'category': unicode(row[3]),
-                'neighbors': self._database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
-            })
-            bar.next()
-        bar.finish()
+
+        #bar = Bar('Calculating neighbors', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
+        #for row in self._database.get_connection().execute('''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\''''):
+        #    self._all_points.append({
+        #        'id': int(row[5]),
+        #        'checkins': int(row[4]),
+        #        'category': unicode(row[3]),
+        #        'neighbors': self._database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
+        #    })
+        #    bar.next()
+        #bar.finish()
+
 
         # calculate global category parameters
         for outer, _ in self._categories.items():
@@ -140,12 +143,11 @@ class RankNet(object):
 
         # calculate mean category numbers
         bar = Bar('Calculating mean category numbers', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
-        for point in self._all_points:
-            self._database.expand_neighbors(point)
-            for neighbor in point['neighbors']:
-                self._mean_category_number[neighbor['category']][point['category']] += 1
-            self._database.release_neighbors(point)
-
+        for row in self._database.get_connection().execute(
+                '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\''''):
+            neighbors = self._database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
+            for neighbor in neighbors:
+                self._mean_category_number[neighbor['category']][unicode(row[3])] += 1
             bar.next()
 
         for p, _ in self._categories.items():
@@ -168,16 +170,16 @@ class RankNet(object):
                 k_prefix = float(total_num - self._categories[p]) / (self._categories[p] * self._categories[l])
 
                 k_suffix = 0
-                for pt in self._all_points:
-                    if pt['category'] == p:
-                        self._database.expand_neighbors(pt)
-                        neighbor_categories = self._neighbor_categories(pt)
+                for row in self._database.get_connection().execute(
+                        '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\''''):
+                    if unicode(row[3]) == p:
+                        neighbors = self._database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
+                        neighbor_categories = self._neighbor_categories(neighbors)
 
-                        if len(pt['neighbors']) - neighbor_categories[p] == 0:
+                        if len(neighbors) - neighbor_categories[p] == 0:
                             continue
 
-                        k_suffix += float(neighbor_categories[l]) / (len(pt['neighbors']) - neighbor_categories[p])
-                        self._database.release_neighbors(pt)
+                        k_suffix += float(neighbor_categories[l]) / (len(neighbors) - neighbor_categories[p])
 
                 self._category_coefficient[p][l] = k_prefix * k_suffix
 
@@ -187,13 +189,14 @@ class RankNet(object):
 
         bar = Bar('Calculating features', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
         # calculate features
-        for point in self._all_points:
-            self._database.expand_neighbors(point)
+        for row in self._database.get_connection().execute(
+                '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\''''):
+            neighbors = self._database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
             # add label
-            self._labels.append([int(point['checkins'])])
+            self._labels.append([int(row[4])])
             # add feature
-            self._features.append(self._vectorize_point(point, u'生活娱乐'))
-            self._database.release_neighbors(point)
+            self._features.append(self._vectorize_point(neighbors, u'生活娱乐'))
+
             bar.next()
 
         bar.finish()
@@ -375,10 +378,19 @@ class RankNet(object):
         # Train model.
         history = model.fit([X1, X2], y, batch_size=batches, epochs=epochs, verbose=1)
 
+        self._model = model
+
         # Generate scores from document/query features.
         self._score_function = backend.function([rel_doc], [rel_score])
 
-    def train(self, database, train_file, epochs=1000, batches=10):
+    def _load_model(self, file_path):
+        from keras.models import load_model
+        self._model = load_model(file_path)
+
+    def _save_model(self):
+        self._model.save(os.path.dirname(self._database.get_file_path()) + 'model.h5')
+
+    def train(self, database, train_file, model_file, epochs=1000, batches=10):
         # open database connection
         self._database = Database(database)
 
@@ -387,16 +399,19 @@ class RankNet(object):
         else:
             self._read_train_data(train_file)
 
-        print('[TensorFlow] Start training model...')
-        start_time = time.clock()
-
-        self._keras_train_model(self._features, self._labels, epochs=epochs, batches=batches)
-
-        end_time = time.clock()
+        if model_file is not None:
+            print('[TensorFlow] Trained model file found, loading model...')
+            self._load_model(model_file)
+            print('[TensorFlow] Trained model loaded.')
+        else:
+            print('[TensorFlow] Start training model...')
+            start_time = time.clock()
+            self._keras_train_model(self._features, self._labels, epochs=epochs, batches=batches)
+            end_time = time.clock()
+            print '[TensorFlow] Model trained in %f seconds' % (end_time - start_time)
 
         self._is_ready = True
 
-        print '[TensorFlow] Model trained in %f seconds' % (end_time - start_time)
         return
 
     def rank(self, query_points, caller):
@@ -408,7 +423,7 @@ class RankNet(object):
 
         features = []
         for point in query_points:
-            x = self._vectorize_point(point, u'生活娱乐')
+            x = self._vectorize_point(point['neighbors'], u'生活娱乐')
             features.append(x)
 
             point['density'] = x[0]
@@ -419,7 +434,6 @@ class RankNet(object):
 
         labels = self._score_function([features])[0]
 
-        print(len(labels))
         for i in range(len(labels)):
             query_points[i]['score'] = float(labels[i][0])
 
