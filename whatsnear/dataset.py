@@ -155,8 +155,8 @@ class Dataset(object):
         progress_process = mp.Process(target=self._progress_process,
                                       args=('Calculating mean category numbers', total_num, progress_queue))
         progress_process.start()
-
-        parts = self._split_range(total_num, total_num / mp.cpu_count())
+        parts = self._split_range(total_num, int(math.ceil(float(total_num) / mp.cpu_count())))
+        print(parts)
         processes = []
         for i in xrange(mp.cpu_count()):
             process = mp.Process(target=calculate_local_mean_category, args=(
