@@ -2,10 +2,13 @@
 import tornado.ioloop
 import tornado.web
 import json
+import os
 from ranknet import RankNet
 from database import Database
+from dataset import Dataset
 
 # global ranknet object
+dataset = Dataset()
 ranknet = RankNet()
 conn = None
 
@@ -79,10 +82,23 @@ class NeighborHandler(tornado.web.RequestHandler):
 
 def start_server(database, train=None, model=None, ip='127.0.0.1', port=8080):
     global conn
-    conn = Database(database)
+    global ranknet
+    global dataset
 
-    # train the model
-    ranknet.train(database, train, model)
+    conn = Database(database)
+    dirname = os.path.dirname(database)
+
+    if train is not None:
+        dataset.load(train)
+    else:
+        dataset.prepare(database)
+        dataset.save(dirname + '\train.txt')
+
+    if model is not None:
+        ranknet.load(model)
+    else:
+        ranknet.train(dataset)
+        ranknet.save(dirname + 'model.h5')
 
     # start hosting the server
     app = tornado.web.Application([
