@@ -1,3 +1,4 @@
+# coding=utf-8
 import time
 import json
 import math
@@ -98,21 +99,235 @@ class Dataset(object):
             neighbor_categories[neighbor['category']] += 1
         return neighbor_categories
 
-    def prepare(self, database, train_file):
+    def _split_range(self, max_num, step):
+        parts = []
+        for i in xrange(0, max_num, step):
+            if i + step < max_num:
+                parts.append([i, step])
+            else:
+                parts.append([i, max_num - i])
+        return parts
+
+    def _progress_process(self, title, max, progress_queue):
         from progress.bar import Bar
+        bar = Bar(title, suffix='%(index)d / %(max)d, %(percent)d%%', max=max)
+        cur = 0
+        while cur != max:
+            progress = progress_queue.get()
+            for _ in range(progress):
+                bar.next()
+            cur += progress
+        bar.finish()
+
+    def _calculate_mean_category(self):
         import multiprocessing as mp
 
-        print('[Dataset] Pre-calculated train file not found, calculating training data...')
-        start_time = time.clock()
-
-        self._database.update_geohash()
+        # initialize the queues
+        result_queue = mp.Queue()
+        progress_queue = mp.Queue()
 
         # radius to calculate features
         r = 200
 
         # calculate global parameters
         total_num = self._database.get_total_num()
-        # total_num = 10000
+
+        def calculate_local_mean_category(database, part, categories, result_queue, progress_queue):
+            # initialize local matrix
+            mean_category_number = {}
+            for outer, _ in categories.items():
+                mean_category_number[outer] = {}
+                for inner, _ in categories.items():
+                    mean_category_number[outer][inner] = 0
+
+            database = Database(database)
+            # calculate mean category numbers
+            for row in database.get_connection().execute(
+                            '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
+                            part[0], part[1])):
+                neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
+                for neighbor in neighbors:
+                    mean_category_number[neighbor['category']][unicode(row[3])] += 1
+                progress_queue.put(1)
+
+            result_queue.put(mean_category_number)
+
+        progress_process = mp.Process(target=self._progress_process,
+                                      args=('Calculating mean category numbers', total_num, progress_queue))
+        progress_process.start()
+
+        parts = self._split_range(total_num, total_num / mp.cpu_count())
+        processes = []
+        for i in xrange(mp.cpu_count()):
+            process = mp.Process(target=calculate_local_mean_category, args=(
+                self._database.get_file_path(), parts[i], self._categories, result_queue, progress_queue))
+            processes.append(process)
+            process.start()
+
+        print('[Dataset] Starting %d processes.' % mp.cpu_count())
+
+        for process in processes:
+            process.join()
+
+        progress_process.join()
+
+        print('[Dataset] Processes terminated.')
+
+        # retrieve and merge the results
+        for i in range(len(processes)):
+            mean_category_number = result_queue.get()
+            for p, _ in self._categories.items():
+                for l, _ in self._categories.items():
+                    self._mean_category_number[p][l] += mean_category_number[p][l]
+                    # TODO: to delete this line of code when we run training in full dataset
+                    if self._categories[l] == 0:
+                        continue
+                    mean_category_number[p][l] /= self._categories[l]
+
+    def _calculate_category_coefficients(self):
+        import multiprocessing as mp
+
+        # initialize the queues
+        result_queue = mp.Queue()
+        progress_queue = mp.Queue()
+
+        # radius to calculate features
+        r = 200
+
+        # calculate global parameters
+        total_num = self._database.get_total_num()
+
+        def calculate_local_category_coefficients(database, part, neighbor_category, categories, result_queue, progress_queue):
+            # initialize local matrix
+            category_coefficients = {}
+            for outer, _ in categories.items():
+                category_coefficients[outer] = {}
+                for inner, _ in categories.items():
+                    category_coefficients[outer][inner] = 0
+
+            for (p, l) in part:
+                # TODO: delete this line of code in full dataset
+                if self._categories[p] * self._categories[l] == 0:
+                    continue
+
+                database = Database(database)
+
+                k_prefix = float(total_num - self._categories[p]) / (self._categories[p] * self._categories[l])
+
+                k_suffix = 0
+                for row in database.get_connection().execute(
+                        '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\''''):
+                    if unicode(row[3]) == p:
+                        neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r,
+                                                                          geo=unicode(row[2]))
+                        neighbor_categories = neighbor_category(neighbors)
+
+                        if len(neighbors) - neighbor_categories[p] == 0:
+                            continue
+
+                        k_suffix += float(neighbor_categories[l]) / (len(neighbors) - neighbor_categories[p])
+
+                category_coefficients[p][l] = k_prefix * k_suffix
+                progress_queue.put(1)
+
+            result_queue.put(category_coefficients)
+
+        progress_process = mp.Process(target=self._progress_process,
+                                      args=('Calculating category coefficients', len(self._categories) * len(self._categories), progress_queue))
+        progress_process.start()
+
+        parts = []
+        for p, _ in self._categories.items():
+            for l, _ in self._categories.items():
+                parts.append((p, l))
+
+        print('[Dataset] Starting %d processes.' % mp.cpu_count())
+        step = int(len(parts) / mp.cpu_count())
+        parts = [parts[i:i + step] for i in xrange(0, len(parts), step)]
+        processes = []
+        for i in xrange(mp.cpu_count()):
+            process = mp.Process(target=calculate_local_category_coefficients, args=(
+                self._database.get_file_path(), parts[i], self._neighbor_categories, self._categories, result_queue, progress_queue))
+            processes.append(process)
+            process.start()
+
+        for process in processes:
+            process.join()
+
+        progress_process.join()
+
+        print('[Dataset] Processes terminated.')
+
+        # retrieve and merge the results
+        for part in parts:
+            category_coefficients = result_queue.get()
+            for (p, l) in part:
+                self._category_coefficient[p][l] = category_coefficients[p][l]
+
+    def _calculate_features(self):
+        import multiprocessing as mp
+
+        # initialize the queues
+        result_queue = mp.Queue()
+        progress_queue = mp.Queue()
+
+        # radius to calculate features
+        r = 200
+
+        # calculate global parameters
+        total_num = self._database.get_total_num()
+
+        def calculate_features(database, part, vectorize_point, result_queue, progress_queue):
+            # initialize local matrix
+            labels = []
+            features = []
+
+            database = Database(database)
+            # calculate mean category numbers
+            for row in database.get_connection().execute(
+                            '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
+                            part[0], part[1])):
+                neighbors = self._database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
+                # add label
+                labels.append([int(row[4])])
+                # add feature
+                features.append(vectorize_point(neighbors, u'生活娱乐'))
+                progress_queue.put(1)
+
+            result_queue.put((labels, features))
+
+        progress_process = mp.Process(target=self._progress_process,
+                                      args=('Calculating features', total_num, progress_queue))
+        progress_process.start()
+
+        print('[Dataset] Starting %d processes.' % mp.cpu_count())
+        parts = self._split_range(total_num, total_num / mp.cpu_count())
+        processes = []
+        for i in xrange(mp.cpu_count()):
+            process = mp.Process(target=calculate_features, args=(
+                self._database.get_file_path(), parts[i], self.vectorize_point, result_queue, progress_queue))
+            processes.append(process)
+            process.start()
+
+        for process in processes:
+            process.join()
+
+        progress_process.join()
+
+        print('[Dataset] Processes terminated.')
+
+        # retrieve results
+        for i in range(len(processes)):
+            labels, features = result_queue.get()
+            self._labels.extend(labels)
+            self._features.extend(features)
+
+    def prepare(self, database):
+        print('[Dataset] Pre-calculated train file not found, calculating training data...')
+        start_time = time.clock()
+        self._database = Database(database)
+
+        self._database.update_geohash()
         self._categories = self._database.get_categories()
 
         # calculate and store the neighboring points
@@ -128,8 +343,6 @@ class Dataset(object):
         #    bar.next()
         # bar.finish()
 
-
-        # calculate global category parameters
         # initialize the matrix
         for outer, _ in self._categories.items():
             self._mean_category_number[outer] = {}
@@ -138,119 +351,10 @@ class Dataset(object):
                 self._mean_category_number[outer][inner] = 0
                 self._category_coefficient[outer][inner] = 0
 
-        # split datasets into different parts
-        parts = []
-        step = total_num / mp.cpu_count()
-        for i in xrange(0, total_num, step):
-            if i + step < total_num:
-                parts.append([i, step])
-            else:
-                parts.append([i, total_num - i])
-
-        # initialize the result_queue
-        result_queue = mp.Queue()
-        progress_queue = mp.Queue()
-
-        def progress(title, max, progress_queue):
-            bar = Bar(title, suffix='%(index)d / %(max)d, %(percent)d%%', max=max)
-            cur = 0
-            while cur != max:
-                progress = progress_queue.get()
-                for _ in range(progress):
-                    bar.next()
-                cur += progress
-
-        def calculate_mean_category(database, part, categories, result_queue, progress_queue):
-            # initialize local matrix
-            mean_category_number = {}
-            for outer, _ in categories.items():
-                mean_category_number[outer] = {}
-                for inner, _ in categories.items():
-                    mean_category_number[outer][inner] = 0
-
-            database = Database(database)
-            # calculate mean category numbers
-            bar = Bar('Calculating mean category numbers', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
-            for row in database.get_connection().execute(
-                            '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
-                    part[0], part[1])):
-                neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
-                for neighbor in neighbors:
-                    mean_category_number[neighbor['category']][unicode(row[3])] += 1
-                progress_queue.put(1)
-
-            for p, _ in categories.items():
-                for l, _ in categories.items():
-                    # TODO: to delete this line of code when we run training in full dataset
-                    if categories[l] == 0:
-                        continue
-                    mean_category_number[p][l] /= categories[l]
-
-            result_queue.put(mean_category_number)
-
-            bar.finish()
-
-        progress_process = mp.Process(target=progress,
-                                      args=('Calculating mean category numbers', total_num, progress_queue))
-        progress_process.start()
-
-        processes = []
-        for i in range(mp.cpu_count()):
-            process = mp.Process(target=calculate_mean_category, args=(
-            self._database.get_file_path(), parts[i], self._categories, result_queue, progress_queue))
-            processes.append(process)
-            process.start()
-
-        print('[RankNet] Starting %d processes.' % mp.cpu_count())
-
-        progress_process.join()
-
-        # calculate category coefficients
-        bar = Bar('Calculating category coefficients', suffix='%(index)d / %(max)d, %(percent)d%%',
-                  max=len(self._categories) * len(self._categories))
-        for p, _ in self._categories.items():
-            for l, _ in self._categories.items():
-                # TODO: delete this line of code in full dataset
-                if self._categories[p] * self._categories[l] == 0:
-                    continue
-
-                k_prefix = float(total_num - self._categories[p]) / (self._categories[p] * self._categories[l])
-
-                k_suffix = 0
-                for row in self._database.get_connection().execute(
-                        '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\''''):
-                    if unicode(row[3]) == p:
-                        neighbors = self._database.get_neighboring_points(float(row[0]), float(row[1]), r,
-                                                                          geo=unicode(row[2]))
-                        neighbor_categories = self._neighbor_categories(neighbors)
-
-                        if len(neighbors) - neighbor_categories[p] == 0:
-                            continue
-
-                        k_suffix += float(neighbor_categories[l]) / (len(neighbors) - neighbor_categories[p])
-
-                self._category_coefficient[p][l] = k_prefix * k_suffix
-
-                bar.next()
-
-        bar.finish()
-
-        bar = Bar('Calculating features', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
-        # calculate features
-        for row in self._database.get_connection().execute(
-                '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\''''):
-            neighbors = self._database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
-            # add label
-            self._labels.append([int(row[4])])
-            # add feature
-            self._features.append(self._vectorize_point(neighbors, u'生活娱乐'))
-
-            bar.next()
-
-        bar.finish()
+        # calculate global category parameters
+        self._calculate_mean_category()
+        self._calculate_category_coefficients()
+        self._calculate_features()
 
         end_time = time.clock()
         print('[RankNet] Training data calculated in %f seconds.' % (end_time - start_time))
-
-        # store calculated train data
-        self._write_train_data(os.path.dirname(self._database.get_file_path()) + '/train.txt')
