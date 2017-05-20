@@ -20,7 +20,10 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--ip',
                         action='store', dest='ip', default='127.0.0.1', type=str,
                         help='The ip to bind on.', required=False)
+    parser.add_argument('-m', '--model',
+                        action='store', dest='model',type=str,
+                        help='The trained model to read from.', required=False)
     results = parser.parse_args()
 
     # start server
-    whatsnear.start_server(results.sqlite, results.train, results.ip, results.port)
+    whatsnear.start_server(results.sqlite, results.train, results.model, results.ip, results.port)
