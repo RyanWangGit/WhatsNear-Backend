@@ -32,8 +32,6 @@ class QueryHandler(tornado.web.RequestHandler):
                 'lat': point[1],
                 'neighbors': conn.get_neighboring_points(point[0], point[1], 200)
             }
-            for neighbor in new_point['neighbors']:
-                conn.expand_info(neighbor)
 
             points.append(new_point)
 
@@ -79,12 +77,12 @@ class NeighborHandler(tornado.web.RequestHandler):
         self.write(json.dumps(results))
 
 
-def start_server(database, train=None, ip='127.0.0.1', port=8080):
+def start_server(database, train=None, model=None, ip='127.0.0.1', port=8080):
     global conn
     conn = Database(database)
 
     # train the model
-    ranknet.train(database, train)
+    ranknet.train(database, train, model)
 
     # start hosting the server
     app = tornado.web.Application([
