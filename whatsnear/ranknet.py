@@ -1,211 +1,20 @@
 # coding=utf-8
 import tensorflow as tf
-from database import Database
-import json
-import math
 import random
 import time
-import os
 
 
 class RankNet(object):
-    def __init__(self):
+    def __init__(self, dataset):
         # training data
-        self._labels = []
-        self._features = []
         self._is_ready = False
-        self._database = None
-
-        # global parameters
-        self._mean_category_number = {}
-        self._category_coefficient = {}
-        self._categories = {}
-        self._all_points = []
+        self._dataset = dataset
 
         # model
         self._model = None
 
         # score function
         self._score_function = None
-
-    def _read_train_data(self, train_file):
-        print('[RankNet] Pre-calculated train file found, reading from external file...')
-        start_time = time.clock()
-
-        with open(train_file, 'r') as f:
-            self._mean_category_number = json.loads(f.readline())
-            self._category_coefficient = json.loads(f.readline())
-            self._categories = json.loads(f.readline())
-            self._labels = json.loads(f.readline())
-            self._features = json.loads(f.readline())
-
-        end_time = time.clock()
-        print('[RankNet] Training data read in %f seconds.' % (end_time - start_time))
-
-    def _write_train_data(self, train_file):
-        with open(train_file, 'w') as f:
-            f.write(json.dumps(self._mean_category_number) + '\n')
-            f.write(json.dumps(self._category_coefficient) + '\n')
-            f.write(json.dumps(self._categories) + '\n')
-            f.write(json.dumps(self._labels) + '\n')
-            f.write(json.dumps(self._features))
-        print('[RankNet] Calculated training data stored into %s.' % train_file)
-
-    def _neighbor_categories(self, neighbors):
-        # calculate sub-global parameters
-        neighbor_categories = {}
-        for category, _ in self._categories.items():
-            neighbor_categories[category] = 0
-        for neighbor in neighbors:
-            neighbor_categories[neighbor['category']] += 1
-        return neighbor_categories
-
-    def _vectorize_point(self, neighbors, training_category):
-        neighbor_categories = self._neighbor_categories(neighbors)
-
-        x = []
-
-        # density
-        x.append(len(neighbors))
-
-        # neighbors entropy
-        entropy = 0
-        for (key, value) in neighbor_categories.items():
-            if value == 0:
-                continue
-            entropy += (float(value) / len(neighbors)) * -1 * math.log(float(value) / len(neighbors))
-
-        x.append(entropy)
-
-        # competitiveness
-        competitiveness = 0
-        if training_category in neighbor_categories:
-            competitiveness = -1 * float(neighbor_categories[training_category]) / len(neighbors)
-
-        x.append(competitiveness)
-
-        # quality by jensen
-        jenson_quality = 0
-        for category, _ in self._categories.items():
-            if self._category_coefficient[category][training_category] == 0:
-                continue
-
-            jenson_quality += math.log(self._category_coefficient[category][training_category]) * (
-            neighbor_categories[category] - self._mean_category_number[category][training_category])
-
-        x.append(jenson_quality)
-
-        # area popularity
-        popularity = 0
-        for neighbor in neighbors:
-            popularity += int(neighbor['checkins'])
-
-        x.append(popularity)
-        return x
-
-    def _calculate_train_data(self):
-        from progress.bar import Bar
-
-        print('[RankNet] Pre-calculated train file not found, calculating training data...')
-        start_time = time.clock()
-
-        self._database.update_geohash()
-
-        # radius to calculate features
-        r = 200
-
-        # calculate global parameters
-        total_num = self._database.get_total_num()
-        #total_num = 10000
-        self._categories = self._database.get_categories()
-
-        # calculate and store the neighboring points
-
-        #bar = Bar('Calculating neighbors', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
-        #for row in self._database.get_connection().execute('''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\''''):
-        #    self._all_points.append({
-        #        'id': int(row[5]),
-        #        'checkins': int(row[4]),
-        #        'category': unicode(row[3]),
-        #        'neighbors': self._database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
-        #    })
-        #    bar.next()
-        #bar.finish()
-
-
-        # calculate global category parameters
-        for outer, _ in self._categories.items():
-            self._mean_category_number[outer] = {}
-            self._category_coefficient[outer] = {}
-            for inner, _ in self._categories.items():
-                self._mean_category_number[outer][inner] = 0
-                self._category_coefficient[outer][inner] = 0
-
-        # calculate mean category numbers
-        bar = Bar('Calculating mean category numbers', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
-        for row in self._database.get_connection().execute(
-                '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\''''):
-            neighbors = self._database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
-            for neighbor in neighbors:
-                self._mean_category_number[neighbor['category']][unicode(row[3])] += 1
-            bar.next()
-
-        for p, _ in self._categories.items():
-            for l, _ in self._categories.items():
-                # TODO: to delete this line of code when we run training in full dataset
-                if self._categories[l] == 0:
-                    continue
-                self._mean_category_number[p][l] /= self._categories[l]
-
-        bar.finish()
-
-        # calculate category coefficients
-        bar = Bar('Calculating category coefficients', suffix='%(index)d / %(max)d, %(percent)d%%', max=len(self._categories) * len(self._categories))
-        for p, _ in self._categories.items():
-            for l, _ in self._categories.items():
-                # TODO: delete this line of code in full dataset
-                if self._categories[p] * self._categories[l] == 0:
-                    continue
-
-                k_prefix = float(total_num - self._categories[p]) / (self._categories[p] * self._categories[l])
-
-                k_suffix = 0
-                for row in self._database.get_connection().execute(
-                        '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\''''):
-                    if unicode(row[3]) == p:
-                        neighbors = self._database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
-                        neighbor_categories = self._neighbor_categories(neighbors)
-
-                        if len(neighbors) - neighbor_categories[p] == 0:
-                            continue
-
-                        k_suffix += float(neighbor_categories[l]) / (len(neighbors) - neighbor_categories[p])
-
-                self._category_coefficient[p][l] = k_prefix * k_suffix
-
-                bar.next()
-
-        bar.finish()
-
-        bar = Bar('Calculating features', suffix='%(index)d / %(max)d, %(percent)d%%', max=total_num)
-        # calculate features
-        for row in self._database.get_connection().execute(
-                '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\''''):
-            neighbors = self._database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
-            # add label
-            self._labels.append([int(row[4])])
-            # add feature
-            self._features.append(self._vectorize_point(neighbors, u'生活娱乐'))
-
-            bar.next()
-
-        bar.finish()
-
-        end_time = time.clock()
-        print('[RankNet] Training data calculated in %f seconds.' % (end_time - start_time))
-
-        # store calculated train data
-        self._write_train_data(os.path.dirname(self._database.get_file_path()) + '/train.txt')
 
     def get_train_data(self, batch_size=32):
         import numpy as np
@@ -383,36 +192,25 @@ class RankNet(object):
         # Generate scores from document/query features.
         self._score_function = backend.function([rel_doc], [rel_score])
 
-    def _load_model(self, file_path):
+    def load(self, path):
         from keras.models import load_model
-        self._model = load_model(file_path)
-
-    def _save_model(self):
-        self._model.save(os.path.dirname(self._database.get_file_path()) + 'model.h5')
-
-    def train(self, database, train_file, model_file, epochs=1000, batches=10):
-        # open database connection
-        self._database = Database(database)
-
-        if train_file is None or not os.path.exists(train_file):
-            self._calculate_train_data()
-        else:
-            self._read_train_data(train_file)
-
-        if model_file is not None:
-            print('[TensorFlow] Trained model file found, loading model...')
-            self._load_model(model_file)
-            print('[TensorFlow] Trained model loaded.')
-        else:
-            print('[TensorFlow] Start training model...')
-            start_time = time.clock()
-            self._keras_train_model(self._features, self._labels, epochs=epochs, batches=batches)
-            end_time = time.clock()
-            print '[TensorFlow] Model trained in %f seconds' % (end_time - start_time)
-
+        print('[TensorFlow] Trained model file found, loading model...')
+        self._model = load_model(path)
         self._is_ready = True
+        print('[TensorFlow] Trained model loaded.')
 
-        return
+    def save(self, path):
+        print('[TensorFlow] Saving model...')
+        self._model.save(path)
+        print('[TensorFlow] Model saved to %s' % path)
+
+    def train(self, dataset, epochs=1000, batches=10):
+        print('[TensorFlow] Start training model...')
+        start_time = time.clock()
+        self._keras_train_model(dataset.get_features(), dataset.get_labels(), epochs=epochs, batches=batches)
+        self._is_ready = True
+        end_time = time.clock()
+        print '[TensorFlow] Model trained in %f seconds' % (end_time - start_time)
 
     def rank(self, query_points, caller):
         if not self._is_ready:
