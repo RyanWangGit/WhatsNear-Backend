@@ -246,7 +246,7 @@ class Dataset(object):
                 parts.append((p, l))
 
         print('[Dataset] Starting %d processes.' % mp.cpu_count())
-        step = int(len(parts) / mp.cpu_count())
+        step = int(math.ceil(float(len(parts)) / mp.cpu_count()))
         parts = [parts[i:i + step] for i in xrange(0, len(parts), step)]
         processes = []
         for i in xrange(mp.cpu_count()):
@@ -306,7 +306,7 @@ class Dataset(object):
         progress_process.start()
 
         print('[Dataset] Starting %d processes.' % mp.cpu_count())
-        parts = self._split_range(total_num, total_num / mp.cpu_count())
+        parts = self._split_range(total_num, int(math.ceil(float(total_num) / mp.cpu_count())))
         processes = []
         for i in xrange(mp.cpu_count()):
             process = mp.Process(target=calculate_features, args=(
