@@ -211,7 +211,7 @@ class RankNet(object):
         self._keras_train_model(dataset.get_features(), dataset.get_labels(), epochs=epochs, batches=batches)
         self._is_ready = True
         end_time = time.clock()
-        print '[TensorFlow] Model trained in %f seconds' % (end_time - start_time)
+        print('[TensorFlow] Model trained in %f seconds' % (end_time - start_time))
 
     def rank(self, query_points, caller):
         if not self._is_ready:
