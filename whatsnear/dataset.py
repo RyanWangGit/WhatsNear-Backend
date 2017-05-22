@@ -236,14 +236,14 @@ class Dataset(object):
             result_queue.put(category_coefficients)
             return
 
-        progress_process = mp.Process(target=self._progress_process,
-                                      args=('Calculating category coefficients', len(self._categories) * len(self._categories), progress_queue))
-        progress_process.start()
-
         parts = []
         for p, _ in self._categories.items():
             for l, _ in self._categories.items():
                 parts.append((p, l))
+
+        progress_process = mp.Process(target=self._progress_process,
+                                      args=('Calculating category coefficients', len(parts), progress_queue))
+        progress_process.start()
 
         print('[Dataset] Starting %d processes.' % mp.cpu_count())
         step = int(math.ceil(float(len(parts)) / mp.cpu_count()))
