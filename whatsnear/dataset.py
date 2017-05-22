@@ -212,10 +212,10 @@ class Dataset(object):
 
             for (p, l) in part:
                 # TODO: delete this line of code in full dataset
-                if self._categories[p] * self._categories[l] == 0:
+                if categories[p] * categories[l] == 0:
                     continue
 
-                k_prefix = float(total_num - self._categories[p]) / (self._categories[p] * self._categories[l])
+                k_prefix = float(total_num - categories[p]) / (categories[p] * categories[l])
 
                 k_suffix = 0
                 for row in database.get_connection().execute(
