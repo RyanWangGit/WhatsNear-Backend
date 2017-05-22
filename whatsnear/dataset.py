@@ -219,7 +219,7 @@ class Dataset(object):
 
                 k_suffix = 0
                 for row in database.get_connection().execute(
-                        '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\' LIMIT %d''' % database.get_total_num()):
+                        '''SELECT lng,lat,geohash,category FROM \'Beijing-Checkins\' LIMIT %d''' % database.get_total_num()):
                     if unicode(row[3]) == p:
                         neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r,
                                                                           geo=unicode(row[2]))
