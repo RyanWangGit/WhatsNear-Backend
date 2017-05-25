@@ -159,7 +159,9 @@ class Dataset(object):
                 p = unicode(row[3])
                 neighbor_categories = neighbor_category(neighbors)
                 sub = (len(neighbors) - neighbor_categories[p])
+                
                 if sub == 0:
+                    progress_queue.put(1)
                     continue
 
                 for l, num in neighbor_categories.items():
