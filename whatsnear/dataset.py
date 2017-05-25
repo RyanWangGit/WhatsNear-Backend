@@ -121,7 +121,7 @@ class Dataset(object):
         bar.finish()
         print('[Dataset-Process] Progress process %d finished.' % mp.current_process().pid)
 
-    def _calculate_mean_category(self):
+    def _calculate_global_parameters(self):
         import multiprocessing as mp
 
         # initialize the queues
@@ -134,13 +134,16 @@ class Dataset(object):
         # calculate global parameters
         total_num = self._database.get_total_num()
 
-        def calculate_local_mean_category(database, part, categories, result_queue, progress_queue):
+        def calculate_local_parameters(database, part, neighbor_category, categories, result_queue, progress_queue):
             # initialize local matrix
             mean_category_number = {}
+            k_suffixes = {}
             for outer, _ in categories.items():
                 mean_category_number[outer] = {}
+                k_suffixes[outer] = {}
                 for inner, _ in categories.items():
                     mean_category_number[outer][inner] = 0
+                    k_suffixes[outer][inner] = 0
 
             database = Database(database)
             # calculate mean category numbers
@@ -148,21 +151,35 @@ class Dataset(object):
                             '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
                             part[0], part[1])):
                 neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
+                # calculate mean category number
                 for neighbor in neighbors:
                     mean_category_number[neighbor['category']][unicode(row[3])] += 1
+
+                # calculate category coefficient suffix
+                neighbor_categories = neighbor_category(neighbors)
+                sub = (len(neighbors) - neighbor_categories[p])
+                if sub == 0:
+                    continue
+
+                for l, num in neighbor_categories.items():
+                    if num == 0:
+                        continue
+                    k_suffixes[p][l] += float(num) / sub
+
                 progress_queue.put(1)
 
-            result_queue.put(mean_category_number)
+            result_queue.put((mean_category_number, k_suffixes))
             return
 
+        # create and start processes
         progress_process = mp.Process(target=self._progress_process,
-                                      args=('Calculating mean category numbers', total_num, progress_queue))
+                                      args=('Calculating global parameters', total_num, progress_queue))
         progress_process.start()
         parts = self._split_range(total_num, int(math.ceil(float(total_num) / mp.cpu_count())))
         processes = []
         for i in xrange(mp.cpu_count()):
-            process = mp.Process(target=calculate_local_mean_category, args=(
-                self._database.get_file_path(), parts[i], self._categories, result_queue, progress_queue))
+            process = mp.Process(target=calculate_local_parameters, args=(
+                self._database.get_file_path(), parts[i], self._neighbor_categories, self._categories, result_queue, progress_queue))
             processes.append(process)
             process.start()
 
@@ -174,96 +191,18 @@ class Dataset(object):
 
         # retrieve and merge the results
         for i in range(len(processes)):
-            mean_category_number = result_queue.get()
+            mean_category_number, k_suffixes = result_queue.get()
             for p, _ in self._categories.items():
                 for l, _ in self._categories.items():
+                    # merge mean category number
                     self._mean_category_number[p][l] += mean_category_number[p][l]
                     # TODO: to delete this line of code when we run training in full dataset
                     if self._categories[l] == 0:
                         continue
-                    mean_category_number[p][l] /= self._categories[l]
+                    self._mean_category_number[p][l] /= self._categories[l]
 
-        for process in processes:
-            process.join()
-
-    def _calculate_category_coefficients(self):
-        import multiprocessing as mp
-
-        # initialize the queues
-        result_queue = mp.Queue()
-        progress_queue = mp.Queue()
-
-        # radius to calculate features
-        r = 200
-
-        # calculate global parameters
-        total_num = self._database.get_total_num()
-
-        def calculate_local_category_coefficients(database, part, neighbor_category, categories, result_queue, progress_queue):
-            # initialize local matrix
-            category_coefficients = {}
-
-            database = Database(database)
-
-            for outer, _ in categories.items():
-                category_coefficients[outer] = {}
-                for inner, _ in categories.items():
-                    category_coefficients[outer][inner] = 0
-
-            for (p, l) in part:
-                # TODO: delete this line of code in full dataset
-                if categories[p] * categories[l] == 0:
-                    continue
-
-                k_prefix = float(total_num - categories[p]) / (categories[p] * categories[l])
-
-                k_suffix = 0
-                for row in database.get_connection().execute(
-                        '''SELECT lng,lat,geohash,category FROM \'Beijing-Checkins\' LIMIT %d''' % database.get_total_num()):
-                    if unicode(row[3]) == p:
-                        neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r,
-                                                                          geo=unicode(row[2]))
-                        neighbor_categories = neighbor_category(neighbors)
-
-                        if len(neighbors) - neighbor_categories[p] == 0:
-                            continue
-
-                        k_suffix += float(neighbor_categories[l]) / (len(neighbors) - neighbor_categories[p])
-
-                category_coefficients[p][l] = k_prefix * k_suffix
-                progress_queue.put(1)
-
-            result_queue.put(category_coefficients)
-            return
-
-        parts = []
-        for p, _ in self._categories.items():
-            for l, _ in self._categories.items():
-                parts.append((p, l))
-
-        progress_process = mp.Process(target=self._progress_process,
-                                      args=('Calculating category coefficients', len(parts), progress_queue))
-        progress_process.start()
-
-        print('[Dataset] Starting %d processes.' % mp.cpu_count())
-        step = int(math.ceil(float(len(parts)) / mp.cpu_count()))
-        parts = [parts[i:i + step] for i in xrange(0, len(parts), step)]
-        processes = []
-        for i in xrange(mp.cpu_count()):
-            process = mp.Process(target=calculate_local_category_coefficients, args=(
-                self._database.get_file_path(), parts[i], self._neighbor_categories, self._categories, result_queue, progress_queue))
-            processes.append(process)
-            process.start()
-
-        progress_process.join()
-
-        print('[Dataset] Processes terminated.')
-
-        # retrieve and merge the results
-        for part in parts:
-            category_coefficients = result_queue.get()
-            for (p, l) in part:
-                self._category_coefficient[p][l] = category_coefficients[p][l]
+                    k_prefix = float(total_num - self._categories[p]) / (self._categories[p] * self._categories[l])
+                    self._category_coefficient[p][l] = k_prefix * k_suffixes[p][l]
 
         for process in processes:
             process.join()
