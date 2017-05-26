@@ -156,6 +156,7 @@ class Dataset(object):
                     mean_category_number[neighbor['category']][unicode(row[3])] += 1
 
                 # calculate category coefficient suffix
+                p = unicode(row[3])
                 neighbor_categories = neighbor_category(neighbors)
                 sub = (len(neighbors) - neighbor_categories[p])
                 if sub == 0:
