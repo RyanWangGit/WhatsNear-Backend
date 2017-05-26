@@ -198,12 +198,17 @@ class Dataset(object):
                     # merge mean category number
                     self._mean_category_number[p][l] += mean_category_number[p][l]
                     # TODO: to delete this line of code when we run training in full dataset
-                    if self._categories[l] == 0:
-                        continue
-                    self._mean_category_number[p][l] /= self._categories[l]
+                    self._category_coefficient[p][l] += k_suffixes[p][l]
 
-                    k_prefix = float(total_num - self._categories[p]) / (self._categories[p] * self._categories[l])
-                    self._category_coefficient[p][l] = k_prefix * k_suffixes[p][l]
+        # subsequent calculations
+        for p, _ in self._categories.items():
+            for l, _ in self._categories.items():
+                if self._categories[l] == 0:
+                    continue
+                self._mean_category_number[p][l] /= self._categories[l]
+
+                k_prefix = float(total_num - self._categories[p]) / (self._categories[p] * self._categories[l])
+                self._category_coefficient[p][l] *= k_prefix
 
         for process in processes:
             process.join()
