@@ -37,7 +37,7 @@ class Dataset(object):
 
         # competitiveness
         competitiveness = 0
-        if training_category in neighbor_categories:
+        if training_category in neighbor_categories and len(neighbors) != 0:
             competitiveness = -1 * float(neighbor_categories[training_category]) / len(neighbors)
 
         x.append(competitiveness)
@@ -238,12 +238,16 @@ class Dataset(object):
             for row in database.get_connection().execute(
                             '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
                             part[0], part[1])):
-                neighbors = self._database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
-                # add label
-                labels.append([int(row[4])])
-                # add feature
-                features.append(vectorize_point(neighbors, u'生活娱乐'))
-                progress_queue.put(1)
+                try:
+                    neighbors = self._database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
+                    # add feature
+                    features.append(vectorize_point(neighbors, u'生活娱乐'))
+                    # add label
+                    labels.append([int(row[4])])
+                except BaseException, e:
+                    print(e)
+                finally:
+                    progress_queue.put(1)
 
             result_queue.put((labels, features))
             return
