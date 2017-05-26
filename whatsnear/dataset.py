@@ -297,8 +297,7 @@ class Dataset(object):
                 self._category_coefficient[outer][inner] = 0
 
         # calculate global category parameters
-        self._calculate_mean_category()
-        self._calculate_category_coefficients()
+        self._calculate_global_parameters()
         self._calculate_features()
 
         end_time = time.clock()
