@@ -148,7 +148,7 @@ class Dataset(object):
             database = Database(database)
             # calculate mean category numbers
             for row in database.get_connection().execute(
-                            '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
+                            '''SELECT lng,lat,geohash,category FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
                             part[0], part[1])):
                 neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
                 # calculate mean category number
@@ -236,14 +236,14 @@ class Dataset(object):
             database = Database(database)
             # calculate mean category numbers
             for row in database.get_connection().execute(
-                            '''SELECT lng,lat,geohash,category,checkins,id FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
+                            '''SELECT lng,lat,geohash,checkins FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
                             part[0], part[1])):
                 try:
                     neighbors = self._database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
                     # add feature
                     features.append(vectorize_point(neighbors, u'生活娱乐'))
                     # add label
-                    labels.append([int(row[4])])
+                    labels.append([int(row[3])])
                 except BaseException, e:
                     print(e)
                 finally:
