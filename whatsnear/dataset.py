@@ -239,7 +239,7 @@ class Dataset(object):
                             '''SELECT lng,lat,geohash,checkins FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
                             part[0], part[1])):
                 try:
-                    neighbors = self._database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
+                    neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
                     # add feature
                     features.append(vectorize_point(neighbors, u'生活娱乐'))
                     # add label
