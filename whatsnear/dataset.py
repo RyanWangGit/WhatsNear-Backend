@@ -134,7 +134,7 @@ class Dataset(object):
         # calculate global parameters
         total_num = self._database.get_total_num()
 
-        def calculate_local_parameters(database, part, neighbor_category, categories, result_queue, progress_queue):
+        def calculate_local_parameters(db_path, part, neighbor_category, categories, result_queue, progress_queue):
             # initialize local matrix
             mean_category_number = {}
             k_suffixes = {}
@@ -145,7 +145,7 @@ class Dataset(object):
                     mean_category_number[outer][inner] = 0
                     k_suffixes[outer][inner] = 0
 
-            database = Database(database)
+            database = Database(db_path)
             # calculate mean category numbers
             for row in database.get_connection().execute(
                             '''SELECT lng,lat,geohash,category FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
@@ -228,12 +228,12 @@ class Dataset(object):
         # calculate global parameters
         total_num = self._database.get_total_num()
 
-        def calculate_features(database, part, vectorize_point, result_queue, progress_queue):
+        def calculate_features(db_path, part, vectorize_point, result_queue, progress_queue):
             # initialize local matrix
             labels = []
             features = []
 
-            database = Database(database)
+            database = Database(db_path)
             # calculate mean category numbers
             for row in database.get_connection().execute(
                             '''SELECT lng,lat,geohash,checkins FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
