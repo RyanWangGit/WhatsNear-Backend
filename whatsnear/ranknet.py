@@ -204,14 +204,53 @@ class RankNet(object):
         self._model.save(path)
         print('[TensorFlow] Model saved to %s' % path)
 
-    def train(self, dataset, epochs=1000, batches=10):
+    def ndcg(self, y_true, y_score, k=100):
+        import numpy as np
+        y_true = y_true.ravel()
+        y_score = y_score.ravel()
+        y_true_sorted = sorted(y_true, reverse=True)
+        ideal_dcg = 0
+        for i in range(k):
+            ideal_dcg += (2 ** y_true_sorted[i] - 1.) / np.log2(i + 2)
+        dcg = 0
+        argsort_indices = np.argsort(y_score)[::-1]
+        for i in range(k):
+            dcg += (2 ** y_true[argsort_indices[i]] - 1.) / np.log2(i + 2)
+        ndcg = dcg / ideal_dcg
+        return ndcg
+
+    def train(self, dataset, rate=1, epochs=1000, batches=10):
         print('[TensorFlow] Start training model...')
         start_time = time.clock()
         self._dataset = dataset
-        self._keras_train_model(dataset.get_features(), dataset.get_labels(), epochs=epochs, batches=batches)
+        import random
+        train_features = dataset.get_features()[:int(len(dataset.get_features()) * rate)]
+        train_labels = dataset.get_labels()[:int(len(dataset.get_features()) * rate)]
+        test_features = dataset.get_features()[int(len(dataset.get_features()) * rate):]
+        test_labels =dataset.get_labels()[int(len(dataset.get_features()) * rate):]
+
+        self._keras_train_model(train_features, train_labels, epochs=epochs, batches=batches)
         self._is_ready = True
         end_time = time.clock()
         print('[TensorFlow] Model trained in %f seconds' % (end_time - start_time))
+
+        print('[TensorFlow] Start testing...')
+        test_range = range(len(test_features))
+
+        ndcg = 0
+        import numpy as np
+        for _ in range(1000):
+            test =random.sample(test_range, 10)
+            to_rank_features = []
+            to_rank_labels = []
+            for index in test:
+                to_rank_features.append(test_features[index])
+                to_rank_labels.append(test_labels[index])
+
+            scores = self._score_function(to_rank_features)
+            ndcg += self.ndcg(np.array(to_rank_labels),  np.array(scores))
+
+        print('[TensorFlow] testing ended with NDCG %d' % (float(ndcg) / 1000))
 
     def rank(self, query_points, caller):
         if not self._is_ready:

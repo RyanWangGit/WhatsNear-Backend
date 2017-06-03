@@ -97,8 +97,8 @@ def start_server(database, train=None, model=None, ip='127.0.0.1', port=8080):
     if model is not None:
         ranknet.load(model)
     else:
-        ranknet.train(dataset)
-        ranknet.save(dirname + 'model.h5')
+        ranknet.train(dataset, 0.8)
+        ranknet.save(dirname + '\model.h5')
 
     # start hosting the server
     app = tornado.web.Application([
