@@ -170,7 +170,7 @@ class RankNet(object):
         x1 = []
         x2 = []
         indexes = xrange(len(features))
-        for i in xrange(len(features)):
+        for i in xrange(len(features) * 10):
             index1, index2 = random.sample(indexes, 2)
 
             if labels[index1] > labels[index2]:
@@ -222,7 +222,7 @@ class RankNet(object):
             ndcg = float(dcg) / float(ideal_dcg)
         return ndcg
 
-    def train(self, dataset, rate=1, epochs=1, batches=10):
+    def train(self, dataset, rate=1, epochs=10, batches=10):
         print('[TensorFlow] Start training model...')
         start_time = time.clock()
         self._dataset = dataset
@@ -243,7 +243,7 @@ class RankNet(object):
         ndcg = 0
         import numpy as np
         for _ in range(1000):
-            test =random.sample(test_range, 10)
+            test = random.sample(test_range, 10)
             to_rank_features = []
             to_rank_labels = []
             for index in test:
