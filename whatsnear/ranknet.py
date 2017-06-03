@@ -122,7 +122,7 @@ class RankNet(object):
                     # for k in range(0, len(o12_v)):
                     # print "k[%d] o12_v[%f] h_o12_v[%f]" % (k, o12_v[k], h_o12_v[k])
 
-    def _keras_train_model(self, features, labels, epochs=100, batches=10):
+    def _keras_train_model(self, features, labels, epochs=10, batches=10):
         # Michael A. Alcorn (malcorn@redhat.com)
         # A (slightly modified) implementation of RankNet as described in [1].
         #   [1] http://icml.cc/2015/wp-content/uploads/2015/06/icml_ranking.pdf
@@ -170,7 +170,7 @@ class RankNet(object):
         x1 = []
         x2 = []
         indexes = xrange(len(features))
-        for i in xrange(len(features) * 10):
+        for i in xrange(len(features)):
             index1, index2 = random.sample(indexes, 2)
 
             if labels[index1] > labels[index2]:
@@ -204,7 +204,7 @@ class RankNet(object):
         self._model.save(path)
         print('[TensorFlow] Model saved to %s' % path)
 
-    def ndcg(self, y_true, y_score, k=100):
+    def ndcg(self, y_true, y_score, k=10):
         import numpy as np
         y_true = y_true.ravel()
         y_score = y_score.ravel()
@@ -216,10 +216,13 @@ class RankNet(object):
         argsort_indices = np.argsort(y_score)[::-1]
         for i in range(k):
             dcg += (2 ** y_true[argsort_indices[i]] - 1.) / np.log2(i + 2)
-        ndcg = dcg / ideal_dcg
+        if ideal_dcg == 0:
+            ndcg = 1
+        else:
+            ndcg = float(dcg) / float(ideal_dcg)
         return ndcg
 
-    def train(self, dataset, rate=1, epochs=1000, batches=10):
+    def train(self, dataset, rate=1, epochs=1, batches=10):
         print('[TensorFlow] Start training model...')
         start_time = time.clock()
         self._dataset = dataset
@@ -247,10 +250,10 @@ class RankNet(object):
                 to_rank_features.append(test_features[index])
                 to_rank_labels.append(test_labels[index])
 
-            scores = self._score_function(to_rank_features)
+            scores = self._score_function([to_rank_features])[0]
             ndcg += self.ndcg(np.array(to_rank_labels),  np.array(scores))
 
-        print('[TensorFlow] testing ended with NDCG %d' % (float(ndcg) / 1000))
+        print('[TensorFlow] testing ended with NDCG %f' % float(ndcg / 1000))
 
     def rank(self, query_points, caller):
         if not self._is_ready:
