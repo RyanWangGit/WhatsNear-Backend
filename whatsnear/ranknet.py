@@ -169,20 +169,19 @@ class RankNet(object):
         # Fake data.
         x1 = []
         x2 = []
+        y = []
         indexes = xrange(len(features))
-        for i in xrange(len(features) * 10):
-            index1, index2 = random.sample(indexes, 2)
-
-            if labels[index1] > labels[index2]:
-                x1.append(features[index1])
-                x2.append(features[index2])
+        for i in xrange(len(features) - 1):
+            x1.append(features[i])
+            x2.append(features[i + 1])
+            if labels[i][0] == 0 and labels[i][0] == labels[i + 1][0]:
+                y.append([0.5])
             else:
-                x1.append(features[index2])
-                x2.append(features[index1])
+                y.append([float(labels[i][0]) / (labels[i][0] + labels[i + 1][0])])
 
         X1 = np.matrix(x1)
         X2 = np.matrix(x2)
-        y = np.ones((X1.shape[0], 1))
+        y = np.matrix(y)
 
         # Train model.
         history = model.fit([X1, X2], y, batch_size=batches, epochs=epochs, verbose=1)
@@ -230,7 +229,7 @@ class RankNet(object):
         train_features = dataset.get_features()[:int(len(dataset.get_features()) * rate)]
         train_labels = dataset.get_labels()[:int(len(dataset.get_features()) * rate)]
         test_features = dataset.get_features()[int(len(dataset.get_features()) * rate):]
-        test_labels =dataset.get_labels()[int(len(dataset.get_features()) * rate):]
+        test_labels = dataset.get_labels()[int(len(dataset.get_features()) * rate):]
 
         self._keras_train_model(train_features, train_labels, epochs=epochs, batches=batches)
         self._is_ready = True
