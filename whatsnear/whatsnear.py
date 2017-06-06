@@ -31,9 +31,10 @@ class QueryHandler(tornado.web.RequestHandler):
         points = []
         for point in query_points:
             new_point = {
-                'lng': point[0],
-                'lat': point[1],
-                'neighbors': conn.get_neighboring_points(point[0], point[1], 200)
+                'id': point[0],
+                'lng': point[1],
+                'lat': point[2],
+                'neighbors': conn.get_neighboring_points(point[1], point[2], 200)
             }
 
             points.append(new_point)
@@ -73,11 +74,7 @@ class NeighborHandler(tornado.web.RequestHandler):
         lng, lat = json.loads(self.get_argument('point'))
         neighbors = conn.get_neighboring_points(lng, lat, 200)
 
-        results = []
-        for neighbor in neighbors:
-            results.append(conn.get_info(neighbor))
-
-        self.write(json.dumps(results))
+        self.write(json.dumps(neighbors))
 
 
 def start_server(database, train=None, model=None, ip='127.0.0.1', port=8080):
