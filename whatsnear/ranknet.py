@@ -221,7 +221,7 @@ class RankNet(object):
             ndcg = float(dcg) / float(ideal_dcg)
         return ndcg
 
-    def train(self, dataset, rate=1, epochs=10, batches=10):
+    def train(self, dataset, rate=1, epochs=3, batches=10):
         print('[TensorFlow] Start training model...')
         start_time = time.clock()
         self._dataset = dataset
