@@ -1,1 +1,1 @@
-from whatsnear import start_server
+from .core import start_server
