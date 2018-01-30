@@ -149,6 +149,7 @@ class Dataset(object):
             # calculate mean category numbers
             for row in database.get_connection().execute(
                             '''SELECT lng,lat,geohash,category FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
+                                    part[0], part[1])):
                 neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=to_str(row[2]))
                 # calculate mean category number
                 for neighbor in neighbors:
