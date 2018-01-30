@@ -108,15 +108,7 @@ class Dataset(object):
         return neighbor_categories
 
     def _split_range(self, max_num, step):
-        parts = []
-        for i in xrange(0, max_num, step):
-            if i + step < max_num:
-                parts.append([i, step])
-            else:
-                parts.append([i, max_num - i])
-        return parts
-
-    def _progress_process(self, title, max, progress_queue):
+        return [[i, step] if i + step < max_num else [i, max_num - i] for i in xrange(0, max_num, step)]
         from progress.bar import Bar
         import multiprocessing as mp
         bar = Bar(title, suffix='%(index)d / %(max)d, %(percent)d%%', max=max)
@@ -157,7 +149,6 @@ class Dataset(object):
             # calculate mean category numbers
             for row in database.get_connection().execute(
                             '''SELECT lng,lat,geohash,category FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
-                            part[0], part[1])):
                 neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=to_str(row[2]))
                 # calculate mean category number
                 for neighbor in neighbors:
