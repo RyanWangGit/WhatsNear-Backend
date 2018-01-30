@@ -2,9 +2,15 @@
 import time
 import json
 import math
-from six import u as unicode
 from six.moves import xrange
 from .database import Database
+
+
+def to_str(text):
+    try:
+        return unicode(text)
+    except:
+        return str(text)
 
 
 class Dataset(object):
@@ -152,13 +158,13 @@ class Dataset(object):
             for row in database.get_connection().execute(
                             '''SELECT lng,lat,geohash,category FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
                             part[0], part[1])):
-                neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
+                neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=to_str(row[2]))
                 # calculate mean category number
                 for neighbor in neighbors:
-                    mean_category_number[neighbor['category']][unicode(row[3])] += 1
+                    mean_category_number[neighbor['category']][to_str(row[3])] += 1
 
                 # calculate category coefficient suffix
-                p = unicode(row[3])
+                p = to_str(row[3])
                 neighbor_categories = neighbor_category(neighbors)
                 sub = (len(neighbors) - neighbor_categories[p])
                 
