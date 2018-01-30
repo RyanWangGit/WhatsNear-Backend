@@ -252,7 +252,7 @@ class Dataset(object):
                     features.append(vectorize_point(neighbors, u'生活娱乐'))
                     # add label
                     labels.append([int(row[3])])
-                except BaseException, e:
+                except Exception as e:
                     print(e)
                 finally:
                     progress_queue.put(1)
