@@ -8,3 +8,4 @@ tensorflow
 Theano
 tornado
 h5py
+six
