@@ -175,25 +175,22 @@ class Dataset(object):
             return
 
         # create and start processes
-        progress_process = mp.Process(target=self._progress_process,
-                                      args=('Calculating global parameters', total_num, progress_queue))
-        progress_process.start()
-        parts = self._split_range(total_num, int(math.ceil(float(total_num) / mp.cpu_count())))
-        processes = []
-        for i in xrange(mp.cpu_count()):
+        process_count = mp.cpu_count()
+        parts = self._split_range(total_num, int(math.ceil(float(total_num) / process_count)))
+        for i in xrange(process_count):
             process = mp.Process(target=calculate_local_parameters, args=(
-                self._database.get_file_path(), parts[i], self._neighbor_categories, self._categories, result_queue, progress_queue))
-            processes.append(process)
+                self._database.get_file_path(), parts[i], self._neighbor_categories,
+                self._categories, result_queue, progress_queue))
             process.start()
 
-        print('[Dataset] Starting %d processes.' % mp.cpu_count())
+        print('[Dataset] Starting %d processes.' % process_count)
 
-        progress_process.join()
+        self._display_progress('Calculating global parameters', total_num, progress_queue)
 
         print('[Dataset] Processes finished.')
 
         # retrieve and merge the results
-        for i in range(len(processes)):
+        for _ in range(process_count):
             mean_category_number, k_suffixes = result_queue.get()
             for p, _ in self._categories.items():
                 for l, _ in self._categories.items():
@@ -211,9 +208,6 @@ class Dataset(object):
 
                 k_prefix = float(total_num - self._categories[p]) / (self._categories[p] * self._categories[l])
                 self._category_coefficient[p][l] *= k_prefix
-
-        for process in processes:
-            process.join()
 
     def _calculate_features(self):
         import multiprocessing as mp
@@ -252,31 +246,24 @@ class Dataset(object):
             result_queue.put((labels, features))
             return
 
-        progress_process = mp.Process(target=self._progress_process,
-                                      args=('Calculating features', total_num, progress_queue))
-        progress_process.start()
-
-        print('[Dataset] Starting %d processes.' % mp.cpu_count())
-        parts = self._split_range(total_num, int(math.ceil(float(total_num) / mp.cpu_count())))
-        processes = []
-        for i in xrange(mp.cpu_count()):
+        process_count = mp.cpu_count()
+        parts = self._split_range(total_num, int(math.ceil(float(total_num) / process_count)))
+        for i in xrange(process_count):
             process = mp.Process(target=calculate_features, args=(
                 self._database.get_file_path(), parts[i], self.vectorize_point, result_queue, progress_queue))
-            processes.append(process)
             process.start()
 
-        progress_process.join()
+        print('[Dataset] Starting %d processes.' % process_count)
+
+        self._display_progress('Calculating features', total_num, progress_queue)
 
         print('[Dataset] Processes finished.')
 
         # retrieve results
-        for i in range(len(processes)):
+        for _ in xrange(process_count):
             labels, features = result_queue.get()
             self._labels.extend(labels)
             self._features.extend(features)
-
-        for process in processes:
-            process.join()
 
     def prepare(self, database):
         print('[Dataset] Pre-calculated train file not found, calculating training data...')
