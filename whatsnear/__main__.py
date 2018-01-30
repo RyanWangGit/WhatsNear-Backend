@@ -1,7 +1,5 @@
 # coding: utf-8
 
-import csv
-import time
 import whatsnear
 
 if __name__ == '__main__':

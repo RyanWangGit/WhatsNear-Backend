@@ -2,7 +2,15 @@
 import time
 import json
 import math
-from database import Database
+from six.moves import xrange
+from .database import Database
+
+
+def to_str(text):
+    try:
+        return unicode(text)
+    except:
+        return str(text)
 
 
 class Dataset(object):
@@ -100,17 +108,10 @@ class Dataset(object):
         return neighbor_categories
 
     def _split_range(self, max_num, step):
-        parts = []
-        for i in xrange(0, max_num, step):
-            if i + step < max_num:
-                parts.append([i, step])
-            else:
-                parts.append([i, max_num - i])
-        return parts
+        return [[i, step] if i + step < max_num else [i, max_num - i] for i in xrange(0, max_num, step)]
 
-    def _progress_process(self, title, max, progress_queue):
+    def _display_progress(self, title, max, progress_queue):
         from progress.bar import Bar
-        import multiprocessing as mp
         bar = Bar(title, suffix='%(index)d / %(max)d, %(percent)d%%', max=max)
         cur = 0
         while cur != max:
@@ -119,7 +120,6 @@ class Dataset(object):
                 bar.next()
             cur += progress
         bar.finish()
-        print('[Dataset-Process] Progress process %d finished.' % mp.current_process().pid)
 
     def _calculate_global_parameters(self):
         import multiprocessing as mp
@@ -149,14 +149,14 @@ class Dataset(object):
             # calculate mean category numbers
             for row in database.get_connection().execute(
                             '''SELECT lng,lat,geohash,category FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
-                            part[0], part[1])):
-                neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
+                                    part[0], part[1])):
+                neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=to_str(row[2]))
                 # calculate mean category number
                 for neighbor in neighbors:
-                    mean_category_number[neighbor['category']][unicode(row[3])] += 1
+                    mean_category_number[neighbor['category']][to_str(row[3])] += 1
 
                 # calculate category coefficient suffix
-                p = unicode(row[3])
+                p = to_str(row[3])
                 neighbor_categories = neighbor_category(neighbors)
                 sub = (len(neighbors) - neighbor_categories[p])
                 
@@ -175,25 +175,22 @@ class Dataset(object):
             return
 
         # create and start processes
-        progress_process = mp.Process(target=self._progress_process,
-                                      args=('Calculating global parameters', total_num, progress_queue))
-        progress_process.start()
-        parts = self._split_range(total_num, int(math.ceil(float(total_num) / mp.cpu_count())))
-        processes = []
-        for i in xrange(mp.cpu_count()):
+        process_count = mp.cpu_count()
+        parts = self._split_range(total_num, int(math.ceil(float(total_num) / process_count)))
+        for i in xrange(process_count):
             process = mp.Process(target=calculate_local_parameters, args=(
-                self._database.get_file_path(), parts[i], self._neighbor_categories, self._categories, result_queue, progress_queue))
-            processes.append(process)
+                self._database.get_file_path(), parts[i], self._neighbor_categories,
+                self._categories, result_queue, progress_queue))
             process.start()
 
-        print('[Dataset] Starting %d processes.' % mp.cpu_count())
+        print('[Dataset] Starting %d processes.' % process_count)
 
-        progress_process.join()
+        self._display_progress('Calculating global parameters', total_num, progress_queue)
 
-        print('[Dataset] Processes terminated.')
+        print('[Dataset] Processes finished.')
 
         # retrieve and merge the results
-        for i in range(len(processes)):
+        for _ in range(process_count):
             mean_category_number, k_suffixes = result_queue.get()
             for p, _ in self._categories.items():
                 for l, _ in self._categories.items():
@@ -211,9 +208,6 @@ class Dataset(object):
 
                 k_prefix = float(total_num - self._categories[p]) / (self._categories[p] * self._categories[l])
                 self._category_coefficient[p][l] *= k_prefix
-
-        for process in processes:
-            process.join()
 
     def _calculate_features(self):
         import multiprocessing as mp
@@ -244,7 +238,7 @@ class Dataset(object):
                     features.append(vectorize_point(neighbors, u'生活娱乐'))
                     # add label
                     labels.append([int(row[3])])
-                except BaseException, e:
+                except Exception as e:
                     print(e)
                 finally:
                     progress_queue.put(1)
@@ -252,31 +246,24 @@ class Dataset(object):
             result_queue.put((labels, features))
             return
 
-        progress_process = mp.Process(target=self._progress_process,
-                                      args=('Calculating features', total_num, progress_queue))
-        progress_process.start()
-
-        print('[Dataset] Starting %d processes.' % mp.cpu_count())
-        parts = self._split_range(total_num, int(math.ceil(float(total_num) / mp.cpu_count())))
-        processes = []
-        for i in xrange(mp.cpu_count()):
+        process_count = mp.cpu_count()
+        parts = self._split_range(total_num, int(math.ceil(float(total_num) / process_count)))
+        for i in xrange(process_count):
             process = mp.Process(target=calculate_features, args=(
                 self._database.get_file_path(), parts[i], self.vectorize_point, result_queue, progress_queue))
-            processes.append(process)
             process.start()
 
-        progress_process.join()
+        print('[Dataset] Starting %d processes.' % process_count)
 
-        print('[Dataset] Processes terminated.')
+        self._display_progress('Calculating features', total_num, progress_queue)
+
+        print('[Dataset] Processes finished.')
 
         # retrieve results
-        for i in range(len(processes)):
+        for _ in xrange(process_count):
             labels, features = result_queue.get()
             self._labels.extend(labels)
             self._features.extend(features)
-
-        for process in processes:
-            process.join()
 
     def prepare(self, database):
         print('[Dataset] Pre-calculated train file not found, calculating training data...')

@@ -2,6 +2,7 @@
 import tensorflow as tf
 import random
 import time
+from six.moves import xrange
 
 
 class RankNet(object):

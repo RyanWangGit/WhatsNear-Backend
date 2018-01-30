@@ -4,6 +4,13 @@ import sqlite3
 from haversine import haversine
 
 
+def to_str(text):
+    try:
+        return unicode(text)
+    except:
+        return str(text)
+
+
 class Database(object):
     def __init__(self, database):
         self._file_path = database
@@ -15,7 +22,7 @@ class Database(object):
     def _get_globals(self):
         self._total_num = int(self._conn.execute('''SELECT COUNT(*) FROM \'Beijing-Checkins\' ''').fetchone()[0])
         for row in self._conn.execute('''SELECT category, COUNT(*) AS num FROM "Beijing-Checkins" GROUP BY category'''):
-            self._categories[unicode(row[0])] = int(row[1])
+            self._categories[to_str(row[0])] = int(row[1])
         #for row in self._conn.execute('''SELECT category, COUNT(*) AS num FROM (SELECT category FROM "Beijing-CHeckins" LIMIT 10000) GROUP BY category'''):
             #self._categories[unicode(row[0])] = int(row[1])
 
@@ -31,7 +38,7 @@ class Database(object):
         potential_neighbors = []
 
         for point in self._conn.execute('''SELECT lat,lng,category,checkins,id FROM \'Beijing-Checkins\' 
-                                                                     WHERE geohash LIKE \'%s%%\'''' % geo_hash):
+                                             WHERE geohash LIKE \'%s%%\'''' % geo_hash):
             potential_neighbors.append(point)
 
         for neighbor in potential_neighbors:
@@ -40,20 +47,21 @@ class Database(object):
                     'id': int(neighbor[4]),
                     'lat': float(neighbor[0]),
                     'lng': float(neighbor[1]),
-                    'category': unicode(neighbor[2]),
+                    'category': to_str(neighbor[2]),
                     'checkins': int(neighbor[3])
                 })
 
         return neighbors
 
     def expand_info(self, point):
-        row = self._conn.execute('''SELECT lng,lat,name,address,category,checkins FROM \'Beijing-Checkins\' WHERE id=? LIMIT 1''',
-                           (point['id'],)).fetchone()
+        row = self._conn.execute('''SELECT lng,lat,name,address,category,checkins 
+                                      FROM \'Beijing-Checkins\' WHERE id=? LIMIT 1''',
+                                 (point['id'],)).fetchone()
         point['lng'] = float(row[0])
         point['lat'] = float(row[1])
-        point['name'] = unicode(row[2])
-        point['address'] = unicode(row[3])
-        point['category'] = unicode(row[4])
+        point['name'] = to_str(row[2])
+        point['address'] = to_str(row[3])
+        point['category'] = to_str(row[4])
         point['checkins'] = int(row[5])
         return point
 
