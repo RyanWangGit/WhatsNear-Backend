@@ -190,7 +190,7 @@ class Dataset(object):
 
         progress_process.join()
 
-        print('[Dataset] Processes terminated.')
+        print('[Dataset] Processes finished.')
 
         # retrieve and merge the results
         for i in range(len(processes)):
@@ -267,7 +267,7 @@ class Dataset(object):
 
         progress_process.join()
 
-        print('[Dataset] Processes terminated.')
+        print('[Dataset] Processes finished.')
 
         # retrieve results
         for i in range(len(processes)):
