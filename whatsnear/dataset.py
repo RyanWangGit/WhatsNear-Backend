@@ -2,6 +2,8 @@
 import time
 import json
 import math
+from six import u as unicode
+from six.moves import xrange
 from .database import Database
 
 

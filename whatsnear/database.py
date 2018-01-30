@@ -1,6 +1,7 @@
 # coding=utf-8
 import geohash
 import sqlite3
+from six import u as unicode
 from haversine import haversine
 
 
