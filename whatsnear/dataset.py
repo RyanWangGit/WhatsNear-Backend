@@ -109,8 +109,9 @@ class Dataset(object):
 
     def _split_range(self, max_num, step):
         return [[i, step] if i + step < max_num else [i, max_num - i] for i in xrange(0, max_num, step)]
+
+    def _display_progress(self, title, max, progress_queue):
         from progress.bar import Bar
-        import multiprocessing as mp
         bar = Bar(title, suffix='%(index)d / %(max)d, %(percent)d%%', max=max)
         cur = 0
         while cur != max:
@@ -119,7 +120,6 @@ class Dataset(object):
                 bar.next()
             cur += progress
         bar.finish()
-        print('[Dataset-Process] Progress process %d finished.' % mp.current_process().pid)
 
     def _calculate_global_parameters(self):
         import multiprocessing as mp
