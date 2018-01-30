@@ -31,7 +31,7 @@ class Database(object):
         potential_neighbors = []
 
         for point in self._conn.execute('''SELECT lat,lng,category,checkins,id FROM \'Beijing-Checkins\' 
-                                                                     WHERE geohash LIKE \'%s%%\'''' % geo_hash):
+                                             WHERE geohash LIKE \'%s%%\'''' % geo_hash):
             potential_neighbors.append(point)
 
         for neighbor in potential_neighbors:
@@ -47,7 +47,8 @@ class Database(object):
         return neighbors
 
     def expand_info(self, point):
-        row = self._conn.execute('''SELECT lng,lat,name,address,category,checkins FROM \'Beijing-Checkins\' WHERE id=? LIMIT 1''',
+        row = self._conn.execute('''SELECT lng,lat,name,address,category,checkins 
+                                      FROM \'Beijing-Checkins\' WHERE id=? LIMIT 1''',
                            (point['id'],)).fetchone()
         point['lng'] = float(row[0])
         point['lat'] = float(row[1])
