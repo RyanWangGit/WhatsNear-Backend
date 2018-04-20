@@ -1,11 +1,9 @@
 haversine
-Keras
 numpy
 progress
 python-geohash
 scipy
 tensorflow
-Theano
 tornado
 h5py
 six
