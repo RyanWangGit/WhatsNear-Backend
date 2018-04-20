@@ -1,5 +1,5 @@
-# coding=utf-8
 import tensorflow as tf
+# -*- coding: utf-8 -*-
 import random
 import time
 from six.moves import xrange
