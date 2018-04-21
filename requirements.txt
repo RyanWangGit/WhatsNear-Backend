@@ -1,9 +1,0 @@
-haversine
-numpy
-progress
-python-geohash
-scipy
-tensorflow
-tornado
-h5py
-six
