@@ -1,4 +1,4 @@
-# WhatsNear-Backend
+# WhatsNear-Backend [![Build Status](https://www.travis-ci.org/RyanWangGit/WhatsNear-Backend.svg?branch=master)](https://www.travis-ci.org/RyanWangGit/WhatsNear-Backend) [![codecov](https://codecov.io/gh/RyanWangGit/WhatsNear-Backend/branch/master/graph/badge.svg)](https://codecov.io/gh/RyanWangGit/WhatsNear-Backend)
 
 This Project Serves as the Backend for [WhatsNear](https://github.com/RyanWangGit/WhatsNear).
 
