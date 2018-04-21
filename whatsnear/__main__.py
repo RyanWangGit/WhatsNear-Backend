@@ -2,7 +2,8 @@
 
 import whatsnear
 
-if __name__ == '__main__':
+
+def main():
     # set up argument parser
     import argparse
     parser = argparse.ArgumentParser(description='Backend for WhatsNear.')
@@ -19,9 +20,13 @@ if __name__ == '__main__':
                         action='store', dest='ip', default='127.0.0.1', type=str,
                         help='The ip to bind on.', required=False)
     parser.add_argument('-m', '--model',
-                        action='store', dest='model',type=str,
+                        action='store', dest='model', type=str,
                         help='The trained model to read from.', required=False)
     results = parser.parse_args()
 
     # start server
     whatsnear.start_server(results.sqlite, results.train, results.model, results.ip, results.port)
+
+
+if __name__ == '__main__':
+    main()
