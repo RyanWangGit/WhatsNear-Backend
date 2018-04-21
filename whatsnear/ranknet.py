@@ -172,6 +172,7 @@ class RankNet(object):
             ndcg += self.ndcg(np.array(to_rank_labels),  np.array(scores))
 
         print('[TensorFlow] testing ended with NDCG %f' % float(ndcg / 1000))
+        return float(ndcg / 1000)
 
     def rank(self, query_points, caller):
         if not self._is_ready:
