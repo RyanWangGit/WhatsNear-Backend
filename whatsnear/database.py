@@ -3,13 +3,6 @@ import sqlite3
 from haversine import haversine
 
 
-def to_str(text):
-    try:
-        return unicode(text)
-    except:
-        return str(text)
-
-
 class Database(object):
     def __init__(self, database):
         self._file_path = database
@@ -21,7 +14,7 @@ class Database(object):
     def _get_globals(self):
         self._total_num = int(self._conn.execute('''SELECT COUNT(*) FROM \'Beijing-Checkins\' ''').fetchone()[0])
         for row in self._conn.execute('''SELECT category, COUNT(*) AS num FROM "Beijing-Checkins" GROUP BY category'''):
-            self._categories[to_str(row[0])] = int(row[1])
+            self._categories[str(row[0])] = int(row[1])
         #for row in self._conn.execute('''SELECT category, COUNT(*) AS num FROM (SELECT category FROM "Beijing-CHeckins" LIMIT 10000) GROUP BY category'''):
             #self._categories[unicode(row[0])] = int(row[1])
 
@@ -46,7 +39,7 @@ class Database(object):
                     'id': int(neighbor[4]),
                     'lat': float(neighbor[0]),
                     'lng': float(neighbor[1]),
-                    'category': to_str(neighbor[2]),
+                    'category': str(neighbor[2]),
                     'checkins': int(neighbor[3])
                 })
 
@@ -58,9 +51,9 @@ class Database(object):
                                  (point['id'],)).fetchone()
         point['lng'] = float(row[0])
         point['lat'] = float(row[1])
-        point['name'] = to_str(row[2])
-        point['address'] = to_str(row[3])
-        point['category'] = to_str(row[4])
+        point['name'] = str(row[2])
+        point['address'] = str(row[3])
+        point['category'] = str(row[4])
         point['checkins'] = int(row[5])
         return point
 
@@ -79,7 +72,7 @@ class Database(object):
             row = self._conn.execute('''SELECT checkins,category FROM \'Beijing-Checkins\' WHERE id=? LIMIT 1''',
                                      (neighbor['id'],)).fetchone()
             neighbor['checkins'] = int(row[0])
-            neighbor['category'] = unicode(row[1])
+            neighbor['category'] = str(row[1])
 
         return point
 

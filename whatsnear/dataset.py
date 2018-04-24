@@ -1,15 +1,7 @@
 import time
 import json
 import math
-from six.moves import xrange
 from .database import Database
-
-
-def to_str(text):
-    try:
-        return unicode(text)
-    except:
-        return str(text)
 
 
 class Dataset(object):
@@ -107,7 +99,7 @@ class Dataset(object):
         return neighbor_categories
 
     def _split_range(self, max_num, step):
-        return [[i, step] if i + step < max_num else [i, max_num - i] for i in xrange(0, max_num, step)]
+        return [[i, step] if i + step < max_num else [i, max_num - i] for i in range(0, max_num, step)]
 
     def _display_progress(self, title, max, progress_queue):
         from progress.bar import Bar
@@ -149,13 +141,13 @@ class Dataset(object):
             for row in database.get_connection().execute(
                             '''SELECT lng,lat,geohash,category FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
                                     part[0], part[1])):
-                neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=to_str(row[2]))
+                neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=str(row[2]))
                 # calculate mean category number
                 for neighbor in neighbors:
-                    mean_category_number[neighbor['category']][to_str(row[3])] += 1
+                    mean_category_number[neighbor['category']][str(row[3])] += 1
 
                 # calculate category coefficient suffix
-                p = to_str(row[3])
+                p = str(row[3])
                 neighbor_categories = neighbor_category(neighbors)
                 sub = (len(neighbors) - neighbor_categories[p])
                 
@@ -176,7 +168,7 @@ class Dataset(object):
         # create and start processes
         process_count = mp.cpu_count()
         parts = self._split_range(total_num, int(math.ceil(float(total_num) / process_count)))
-        for i in xrange(process_count):
+        for i in range(process_count):
             process = mp.Process(target=calculate_local_parameters, args=(
                 self._database.get_file_path(), parts[i], self._neighbor_categories,
                 self._categories, result_queue, progress_queue))
@@ -232,9 +224,9 @@ class Dataset(object):
                             '''SELECT lng,lat,geohash,checkins FROM \'Beijing-Checkins\' LIMIT %d,%d''' % (
                             part[0], part[1])):
                 try:
-                    neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=unicode(row[2]))
+                    neighbors = database.get_neighboring_points(float(row[0]), float(row[1]), r, geo=str(row[2]))
                     # add feature
-                    features.append(vectorize_point(neighbors, u'生活娱乐'))
+                    features.append(vectorize_point(neighbors, '生活娱乐'))
                     # add label
                     labels.append([int(row[3])])
                 except Exception as e:
@@ -247,7 +239,7 @@ class Dataset(object):
 
         process_count = mp.cpu_count()
         parts = self._split_range(total_num, int(math.ceil(float(total_num) / process_count)))
-        for i in xrange(process_count):
+        for i in range(process_count):
             process = mp.Process(target=calculate_features, args=(
                 self._database.get_file_path(), parts[i], self.vectorize_point, result_queue, progress_queue))
             process.start()
@@ -259,7 +251,7 @@ class Dataset(object):
         print('[Dataset] Processes finished.')
 
         # retrieve results
-        for _ in xrange(process_count):
+        for _ in range(process_count):
             labels, features = result_queue.get()
             self._labels.extend(labels)
             self._features.extend(features)

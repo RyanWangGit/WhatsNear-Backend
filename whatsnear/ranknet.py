@@ -1,6 +1,5 @@
 import random
 import time
-from six.moves import xrange
 import numpy as np
 
 
@@ -91,8 +90,8 @@ class RankNet(object):
         x1 = []
         x2 = []
         y = []
-        indexes = xrange(len(features))
-        for i in xrange(len(features) - 1):
+        indexes = range(len(features))
+        for i in range(len(features) - 1):
             x1.append(features[i])
             x2.append(features[i + 1])
             if labels[i][0] == 0 and labels[i][0] == labels[i + 1][0]:

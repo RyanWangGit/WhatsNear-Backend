@@ -11,6 +11,7 @@ dataset = Dataset()
 ranknet = RankNet()
 conn = None
 
+
 class WhatsNearHandler(tornado.web.RequestHandler):
     def get(self):
         self.add_header('Access-Control-Allow-Origin', '*')
