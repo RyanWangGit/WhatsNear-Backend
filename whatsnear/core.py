@@ -52,15 +52,16 @@ class HotHandler(tornado.web.RequestHandler):
         result = []
         cursor = conn.get_connection().cursor()
         cursor.execute(
-            '''SELECT lng,lat,name,address,checkins,id FROM 'Beijing-Checkins' WHERE category='生活娱乐' AND checkins > 0 ORDER BY checkins DESC LIMIT 1000''')
+            '''SELECT lng,lat,name,address,checkins,id FROM 'Beijing-Checkins' 
+                   WHERE category='生活娱乐' AND checkins > 0 ORDER BY checkins DESC LIMIT 1000''')
 
         for row in cursor.fetchall():
             result.append({
-                'id': unicode(row[5]),
-                'lng': unicode(row[0]),
-                'lat': unicode(row[1]),
-                'name': unicode(row[2]),
-                'address': unicode(row[3]),
+                'id': str(row[5]),
+                'lng': str(row[0]),
+                'lat': str(row[1]),
+                'name': str(row[2]),
+                'address': str(row[3]),
                 'checkins': int(row[4])
             })
         self.write(json.dumps(result))
