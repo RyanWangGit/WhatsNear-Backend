@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import geohash
 import sqlite3
 from haversine import haversine
