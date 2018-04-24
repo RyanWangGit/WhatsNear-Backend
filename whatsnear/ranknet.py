@@ -26,38 +26,38 @@ class RankNet(object):
 
         dimension = len(features[0])
 
-        # Model.
+        # model
         h_1 = Dense(128, activation="relu")
         h_2 = Dense(64, activation="relu")
         h_3 = Dense(32, activation="relu")
         s = Dense(1)
 
-        # Relevant document score.
+        # relevant document score
         rel_doc = Input(shape=(dimension,), dtype="float32")
         h_1_rel = h_1(rel_doc)
         h_2_rel = h_2(h_1_rel)
         h_3_rel = h_3(h_2_rel)
         rel_score = s(h_3_rel)
 
-        # Irrelevant document score.
+        # irrelevant document score
         irr_doc = Input(shape=(dimension,), dtype="float32")
         h_1_irr = h_1(irr_doc)
         h_2_irr = h_2(h_1_irr)
         h_3_irr = h_3(h_2_irr)
         irr_score = s(h_3_irr)
 
-        # Subtract scores.
+        # subtract scores
         negated_irr_score = Lambda(lambda x: -1 * x, output_shape=(1,))(irr_score)
         diff = Add()([rel_score, negated_irr_score])
 
-        # Pass difference through sigmoid function.
+        # pass difference through sigmoid function
         prob = Activation("sigmoid")(diff)
 
-        # Build model.
+        # build model.
         model = Model(inputs=[rel_doc, irr_doc], outputs=prob)
         model.compile(optimizer="adadelta", loss="binary_crossentropy")
 
-        # Fake data.
+        # feed in data
         x1 = []
         x2 = []
         y = []
@@ -73,12 +73,12 @@ class RankNet(object):
         X2 = np.matrix(x2)
         y = np.matrix(y)
 
-        # Train model.
         history = model.fit([X1, X2], y, batch_size=batches, epochs=epochs, verbose=1)
+        # train
 
         self._model = model
 
-        # Generate scores from document/query features.
+        # generate scores from document/query features
         self._score_function = backend.function([rel_doc], [rel_score])
 
     def load(self, path):
