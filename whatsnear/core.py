@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import tornado.ioloop
 import tornado.web
 import json
@@ -11,6 +10,7 @@ from .dataset import Dataset
 dataset = Dataset()
 ranknet = RankNet()
 conn = None
+
 
 class WhatsNearHandler(tornado.web.RequestHandler):
     def get(self):
