@@ -73,8 +73,8 @@ class RankNet(object):
         X2 = np.matrix(x2)
         y = np.matrix(y)
 
-        history = model.fit([X1, X2], y, batch_size=batches, epochs=epochs, verbose=1)
         # train
+        model.fit([X1, X2], y, batch_size=batches, epochs=epochs, verbose=1)
 
         self._model = model
 
@@ -97,18 +97,15 @@ class RankNet(object):
         y_true = y_true.ravel()
         y_score = y_score.ravel()
         y_true_sorted = sorted(y_true, reverse=True)
-        ideal_dcg = 0
-        for i in range(k):
-            ideal_dcg += (2 ** y_true_sorted[i] - 1.) / np.log2(i + 2)
+        ideal_dcg = sum((2 ** y_true_sorted[i] - 1.) / np.log2(i + 2) for i in range(k))
+
         dcg = 0
         argsort_indices = np.argsort(y_score)[::-1]
-        for i in range(k):
-            dcg += (2 ** y_true[argsort_indices[i]] - 1.) / np.log2(i + 2)
-        if ideal_dcg == 0:
-            ndcg = 1
-        else:
-            ndcg = float(dcg) / float(ideal_dcg)
-        return ndcg
+
+        dcg += sum((2 ** y_true[argsort_indices[i]] - 1.) / np.log2(i + 2) for i in range(k))
+
+        # return ndcg
+        return 1 if ideal_dcg == 0 else float(dcg) / float(ideal_dcg)
 
     def train(self, dataset, rate=1, epochs=3, batches=10):
         print('[TensorFlow] Start training model...')
