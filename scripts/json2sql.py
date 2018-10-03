@@ -1,5 +1,3 @@
-# -*- coding: UTF-8 -*-
-import codecs
 import json
 import os
 
@@ -18,7 +16,7 @@ def json2sql(json_path, sql_path, table_name, encoding='utf-8', is_multi_line=Fa
     keys = list(data[0].keys())
 
     # open the output file
-    out_file = codecs.open(sql_path, 'w', encoding=encoding)
+    out_file = open(sql_path, 'w', encoding=encoding)
 
     # write the create table
     out_file.write('CREATE TABLE IF NOT EXISTS `%s` (\n' % table_name)
@@ -29,7 +27,7 @@ def json2sql(json_path, sql_path, table_name, encoding='utf-8', is_multi_line=Fa
     out_file.write(')DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;\n\n')
 
     # write insert statement
-    out_file.write('INSERT INTO %s(%s) VALUES\n' % (table_name, ', '.join(keys)))
+    out_file.write('INSERT INTO %s(?) VALUES\n' % (table_name), ', '.join(keys))
 
     # write multiple value
     str_list = []
