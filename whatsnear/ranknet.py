@@ -3,7 +3,7 @@ import time
 import numpy as np
 
 
-class RankNet(object):
+class RankNet:
     def __init__(self):
         # training data
         self._dataset = None
