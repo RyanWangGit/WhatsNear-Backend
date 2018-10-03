@@ -4,7 +4,7 @@ This Project Serves as the Backend for [WhatsNear](https://github.com/RyanWangGi
 
 The [WhastNear](https://github.com/RyanWangGit/WhatsNear) project uses Github Pages to present itself to the public, which will create data requests to this backend program.
 
-# Problem Formulation
+## Problem Formulation
 Refer to [WhatNear-Problem Formulation](https://github.com/RyanWangGit/WhatsNear/blob/source/README.md#problem-formulation)
 
 ## Usage
