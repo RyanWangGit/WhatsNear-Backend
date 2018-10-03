@@ -2,9 +2,9 @@ import tornado.ioloop
 import tornado.web
 import json
 import os
-from .ranknet import RankNet
-from .database import Database
-from .dataset import Dataset
+from whatsnear.ranknet import RankNet
+from whatsnear.database import Database
+from whatsnear.dataset import Dataset
 
 # global ranknet object
 dataset = Dataset()
