@@ -1,4 +1,3 @@
-import pytest
 from whatsnear.dataset import Dataset
 from whatsnear.ranknet import RankNet
 
