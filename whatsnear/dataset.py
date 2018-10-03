@@ -101,11 +101,11 @@ class Dataset(object):
     def _split_range(self, max_num, step):
         return [[i, step] if i + step < max_num else [i, max_num - i] for i in range(0, max_num, step)]
 
-    def _display_progress(self, title, max, progress_queue):
+    def _display_progress(self, title, max_progress, progress_queue):
         from progress.bar import Bar
-        bar = Bar(title, suffix='%(index)d / %(max)d, %(percent)d%%', max=max)
+        bar = Bar(title, suffix='%(index)d / %(max)d, %(percent)d%%', max=max_progress)
         cur = 0
-        while cur != max:
+        while cur != max_progress:
             progress = progress_queue.get()
             for _ in range(progress):
                 bar.next()
