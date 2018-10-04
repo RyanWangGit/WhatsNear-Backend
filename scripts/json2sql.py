@@ -61,7 +61,7 @@ def main():
     results = parser.parse_args()
 
     if not results.sql_path:
-        (root, ext) = os.path.splitext(results.json_path)
+        root, _ = os.path.splitext(results.json_path)
         results.sql_path = root + '.sql'
 
     json2sql(results.json_path, results.sql_path, results.table_name,
