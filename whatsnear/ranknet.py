@@ -69,9 +69,9 @@ class RankNet:
             else:
                 y.append([float(labels[i][0]) / (labels[i][0] + labels[i + 1][0])])
 
-        X1 = np.matrix(x1)
-        X2 = np.matrix(x2)
-        y = np.matrix(y)
+        X1 = np.array(x1)
+        X2 = np.array(x2)
+        y = np.array(y)
 
         # train
         model.fit([X1, X2], y, batch_size=batches, epochs=epochs, verbose=1)
