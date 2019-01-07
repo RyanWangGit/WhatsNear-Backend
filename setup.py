@@ -5,11 +5,11 @@ with open('README.md', encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name='WhatsNear-Backend',
+    name='RankNear',
     version='0.1',
-    description='WhatsNear-Backend - Web App That Ranks Candidate Store Locations Using RankNet.',
+    description='RankNear - Rank the locations nearby using RankNet.',
     long_description=long_description,
-    url='',
+    url='https://github.com/RyanWangGit/ranknear',
     author='Ryan Wang',
     author_email='ryanwang.cs@gmail.com',
     license='MIT',
@@ -31,7 +31,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'whatsnear=whatsnear.__main__:main',
+            'ranknear=ranknear.__main__:main',
         ],
     },
 )

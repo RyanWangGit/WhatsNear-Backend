@@ -1,4 +1,4 @@
-import whatsnear
+import ranknear
 
 
 def main():
@@ -23,7 +23,7 @@ def main():
     results = parser.parse_args()
 
     # start server
-    whatsnear.start_server(results.sqlite, results.train, results.model, results.ip, results.port)
+    ranknear.start_server(results.sqlite, results.train, results.model, results.ip, results.port)
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 import time
 import json
 import math
-from whatsnear.database import Database
+from ranknear.database import Database
 
 
 class Dataset(object):
