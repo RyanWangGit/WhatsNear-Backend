@@ -25,7 +25,7 @@ setup(
     ],
     keywords='Neural Network',
     packages=find_packages(exclude=['tests']),
-    install_requires=['numpy', 'geohash', 'tensorflow', 'tornado', 'h5py', 'haversine', 'progress'],
+    install_requires=['numpy', 'pygeohash', 'tensorflow', 'tornado', 'h5py', 'haversine', 'progress'],
     extras_requires={
         'test': ['pytest-cov', 'pytest', 'coverage'],
     },

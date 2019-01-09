@@ -1,4 +1,4 @@
-from Geohash import geohash
+import pygeohash as geohash
 import sqlite3
 from haversine import haversine
 
