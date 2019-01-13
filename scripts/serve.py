@@ -4,10 +4,8 @@ import json
 import os
 from ranknear.ranknet import RankNet
 from ranknear.database import Database
-from ranknear.dataset import Dataset
 
 # global ranknet object
-dataset = Dataset()
 ranknet = RankNet()
 conn = None
 
@@ -78,26 +76,12 @@ class NeighborHandler(tornado.web.RequestHandler):
         self.write(json.dumps(neighbors))
 
 
-def start_server(database, train=None, model=None, ip='127.0.0.1', port=8080):
+def start_server(database, model, ip='127.0.0.1', port=8080):
     global conn
     global ranknet
-    global dataset
 
     conn = Database(database)
-    dirname = os.path.dirname(database)
-
-    if train is not None:
-        dataset.load(train)
-    else:
-        dataset.prepare(database)
-        dataset.save(dirname + '/train.txt')
-
-    if model is not None:
-        ranknet.load(model)
-    else:
-        ranknet.train(dataset, 0.8)
-        ranknet.save(dirname + '/model.h5')
-
+    ranknet.load(model)
     # start hosting the server
     app = tornado.web.Application([
         ('/', WhatsNearHandler),
@@ -107,5 +91,5 @@ def start_server(database, train=None, model=None, ip='127.0.0.1', port=8080):
     ])
 
     app.listen(port, ip)
-    print('[WhatsNear] Start hosting at http://%s:%d.' % (ip, port))
+
     tornado.ioloop.IOLoop.current().start()
