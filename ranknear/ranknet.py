@@ -1,6 +1,9 @@
 import random
 import time
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class RankNet:
@@ -83,15 +86,15 @@ class RankNet:
 
     def load(self, path):
         from tensorflow.python.keras.models import load_model
-        print('[TensorFlow] Trained model file found, loading model...')
+        logger.info('Trained model file found, loading model...')
         self._model = load_model(path)
         self._is_ready = True
-        print('[TensorFlow] Trained model loaded.')
+        logger.info(' Trained model loaded.')
 
     def save(self, path):
-        print('[TensorFlow] Saving model...')
+        logger.info('Saving model ...')
         self._model.save(path)
-        print('[TensorFlow] Model saved to %s' % path)
+        logger.info('Model saved to {}.'.format(path))
 
     def ndcg(self, y_true, y_score, k=10):
         y_true = y_true.ravel()
@@ -108,7 +111,7 @@ class RankNet:
         return 1 if ideal_dcg == 0 else float(dcg) / float(ideal_dcg)
 
     def train(self, dataset, rate=1, epochs=3, batches=10):
-        print('[TensorFlow] Start training model...')
+        logger.info('Start training model...')
         start_time = time.clock()
         self._dataset = dataset
         train_features = dataset.get_features()[:int(len(dataset.get_features()) * rate)]
@@ -119,9 +122,9 @@ class RankNet:
         self._train_model(train_features, train_labels, epochs=epochs, batches=batches)
         self._is_ready = True
         end_time = time.clock()
-        print('[TensorFlow] Model trained in %f seconds' % (end_time - start_time))
+        logger.info('Model trained in {.1f} seconds'.format(end_time - start_time))
 
-        print('[TensorFlow] Start testing...')
+        logger.info('Start testing...')
         test_range = range(len(test_features))
 
         ndcg = 0
@@ -136,15 +139,15 @@ class RankNet:
             scores = self._score_function([to_rank_features])[0]
             ndcg += self.ndcg(np.array(to_rank_labels),  np.array(scores))
 
-        print('[TensorFlow] testing ended with NDCG %f' % float(ndcg / 1000))
-        return float(ndcg / 1000)
+        logger.info('Test ended with NDCG {.4f}'.format(ndcg / 1000.0))
+        return ndcg / 1000.0
 
     def rank(self, query_points, caller):
         if not self._is_ready:
-            print('[TensorFlow - 0x%x] Ranker isn\'t ready, train the model or load the pre-trained model first.' % id(caller))
+            logger.error('Ranker isn\'t ready, train the model or load the pre-trained model first.')
             return None
 
-        print('[TensorFlow - 0x%x] Start ranking the query points with size %d.' % (id(caller), len(query_points)))
+        logger.info('Start ranking the query points with size {}.'.format(len(query_points)))
 
         features = []
         for point in query_points:
@@ -164,6 +167,6 @@ class RankNet:
 
         query_points.sort(key=lambda p: p['score'], reverse=True)
 
-        print('[TensorFlow - 0x%x] Ranking finished.' % id(caller))
+        logger.info('Rank finished.')
 
         return query_points
