@@ -16,6 +16,9 @@ install:
   - conda update -q conda
   - conda info -a
   - conda install virtualenv
+  # install tox-conda
+  - git clone https://github.com/drdavella/tox-conda
+  - cd tox-conda && pip install . && cd ..
   - pip install tox-travis
 
 script:
