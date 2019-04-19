@@ -102,7 +102,7 @@ class RankNet:
 
     def train(self, features, labels, train_ratio=1, epochs=3, batches=10):
         logger.info('Start training model...')
-        start_time = time.clock()
+        start_time = time.time()
         assert isinstance(features, np.ndarray) and isinstance(labels, np.ndarray), \
             'Training data should be in the form of numpy.ndarray'
         assert features.shape[0] == labels.shape[0] and labels.shape[1] == 1, \
@@ -115,7 +115,7 @@ class RankNet:
 
         self._train_model(train_features, train_labels, epochs=epochs, batches=batches)
         self._is_ready = True
-        end_time = time.clock()
+        end_time = time.time()
         logger.info('Model trained in {:.1f} seconds'.format(end_time - start_time))
 
         logger.info('Start testing...')
