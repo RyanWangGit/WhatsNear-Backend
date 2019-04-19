@@ -89,7 +89,7 @@ class RankNet:
     def ndcg(self, y_true, y_score, k=10):
         y_true = y_true.ravel()
         y_score = y_score.ravel()
-        y_true_sorted = sorted(y_true, reverse=True)
+        y_true_sorted = np.sort(y_true)[::-1]
         ideal_dcg = sum((2 ** y_true_sorted[i] - 1.) / np.log2(i + 2) for i in range(k))
 
         dcg = 0
