@@ -100,7 +100,7 @@ class RankNet:
         # return ndcg
         return 1 if ideal_dcg == 0 else float(dcg) / float(ideal_dcg)
 
-    def train(self, features, labels, train_ratio=1, epochs=3, batches=10):
+    def train(self, features, labels, train_ratio=0.8, epochs=3, batches=10):
         logger.info('Start training model...')
         start_time = time.time()
         features = np.asarray(features)
