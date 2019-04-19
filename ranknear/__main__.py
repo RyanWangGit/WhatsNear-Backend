@@ -13,7 +13,7 @@ def main():
                         help='The training matrix file to read from.', required=False)
     parser.add_argument('-o', '--out',
                         action='store', dest='model', type=str,
-                        help='The model file to output.', default='./model', required=False)
+                        help='The model file to output.', default='./model.h5', required=False)
     results = parser.parse_args()
 
     # train the model
