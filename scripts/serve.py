@@ -1,15 +1,12 @@
 import tornado.ioloop
 import tornado.web
 import json
-import os
 from ranknear.ranknet import RankNet
 from ranknear.database import Database
-from ranknear.dataset import Dataset
 
 # global ranknet object
-dataset = Dataset()
 ranknet = RankNet()
-conn = None
+connection = None
 
 
 class WhatsNearHandler(tornado.web.RequestHandler):
@@ -34,12 +31,12 @@ class QueryHandler(tornado.web.RequestHandler):
                 'id': point[0],
                 'lng': point[1],
                 'lat': point[2],
-                'neighbors': conn.get_neighboring_points(point[1], point[2], 200)
+                'neighbors': connection.get_neighboring_points(point[1], point[2], 200)
             }
 
             points.append(new_point)
 
-        ranked_points = ranknet.rank(points, self)
+        ranked_points = ranknet.rank(points)
 
         self.write(json.dumps(ranked_points))
 
@@ -50,7 +47,7 @@ class HotHandler(tornado.web.RequestHandler):
         self.add_header('Access-Control-Allow-Origin', '*')
 
         result = []
-        cursor = conn.get_connection().cursor()
+        cursor = connection.get_connection().cursor()
         cursor.execute(
             '''SELECT lng, lat, name, address, checkins, id FROM 'Beijing-Checkins'
                    WHERE category='生活娱乐' AND checkins > 0 ORDER BY checkins DESC LIMIT 1000''')
@@ -73,31 +70,35 @@ class NeighborHandler(tornado.web.RequestHandler):
         self.add_header('Access-Control-Allow-Origin', '*')
 
         lng, lat = json.loads(self.get_argument('point'))
-        neighbors = conn.get_neighboring_points(lng, lat, 200)
+        neighbors = connection.get_neighboring_points(lng, lat, 200)
 
         self.write(json.dumps(neighbors))
 
 
-def start_server(database, train=None, model=None, ip='127.0.0.1', port=8080):
-    global conn
+def main():
+    global connection
     global ranknet
-    global dataset
 
-    conn = Database(database)
-    dirname = os.path.dirname(database)
+    # set up argument parser
+    import argparse
+    parser = argparse.ArgumentParser(description='Backend for WhatsNear.')
+    parser.add_argument('-i', '--ip',
+                        action='store', dest='ip', default='127.0.0.1', type=str,
+                        help='The ip to bind on.', required=False)
+    parser.add_argument('-p', '--port',
+                        action='store', dest='port', default=80, type=int,
+                        help='The port to listen on.', required=False)
+    parser.add_argument('-s', '--sqlite',
+                        action='store', dest='sqlite', type=str,
+                        help='The SQLite3 database to read from.', required=True)
+    parser.add_argument('-m', '--model',
+                        action='store', dest='model', type=str,
+                        help='The trained model to read from.', required=True)
+    results = parser.parse_args()
 
-    if train is not None:
-        dataset.load(train)
-    else:
-        dataset.prepare(database)
-        dataset.save(dirname + '/train.txt')
-
-    if model is not None:
-        ranknet.load(model)
-    else:
-        ranknet.train(dataset, 0.8)
-        ranknet.save(dirname + '/model.h5')
-
+    # start server
+    connection = Database(results.sqlite)
+    ranknet.load(results.model)
     # start hosting the server
     app = tornado.web.Application([
         ('/', WhatsNearHandler),
@@ -106,6 +107,10 @@ def start_server(database, train=None, model=None, ip='127.0.0.1', port=8080):
         ('/neighbor', NeighborHandler)
     ])
 
-    app.listen(port, ip)
-    print('[WhatsNear] Start hosting at http://%s:%d.' % (ip, port))
+    app.listen(results.port, results.ip)
+
     tornado.ioloop.IOLoop.current().start()
+
+
+if __name__ == '__main__':
+    main()

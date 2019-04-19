@@ -1,7 +1,11 @@
 import time
 import json
 import math
+import logging
 from ranknear.database import Database
+
+
+logger = logging.getLogger(__name__)
 
 
 class Dataset(object):
@@ -61,8 +65,8 @@ class Dataset(object):
         return x
 
     def load(self, path):
-        print('[Dataset] Pre-calculated train file found, loading from external file...')
-        start_time = time.clock()
+        logger.info('Pre-calculated train file found, loading from external file...')
+        start_time = time.time()
 
         with open(path, 'r') as f:
             self._mean_category_number = json.loads(f.readline())
@@ -71,8 +75,8 @@ class Dataset(object):
             self._labels = json.loads(f.readline())
             self._features = json.loads(f.readline())
 
-        end_time = time.clock()
-        print('[Dataset] Training data read in %f seconds.' % (end_time - start_time))
+        end_time = time.time()
+        logger.info('Training data read in %f seconds.' % (end_time - start_time))
 
     def save(self, path):
         with open(path, 'w') as f:
@@ -81,7 +85,7 @@ class Dataset(object):
             f.write(json.dumps(self._categories) + '\n')
             f.write(json.dumps(self._labels) + '\n')
             f.write(json.dumps(self._features))
-        print('[Dataset] Calculated training data stored into %s.' % path)
+        logger.info('Calculated training data stored into %s.' % path)
 
     def get_features(self):
         return self._features
@@ -174,11 +178,11 @@ class Dataset(object):
                 self._categories, result_queue, progress_queue))
             process.start()
 
-        print('[Dataset] Starting %d processes.' % process_count)
+        logger.info('Starting {} processes.'.format(process_count))
 
         self._display_progress('Calculating global parameters', total_num, progress_queue)
 
-        print('[Dataset] Processes finished.')
+        logger.info('Processes finished.')
 
         # retrieve and merge the results
         for _ in range(process_count):
@@ -244,11 +248,11 @@ class Dataset(object):
                 self._database.get_file_path(), parts[i], self.vectorize_point, result_queue, progress_queue))
             process.start()
 
-        print('[Dataset] Starting %d processes.' % process_count)
+        logger.info('Starting {} processes.'.format(process_count))
 
         self._display_progress('Calculating features', total_num, progress_queue)
 
-        print('[Dataset] Processes finished.')
+        logger.info('Processes finished.')
 
         # retrieve results
         for _ in range(process_count):
@@ -257,8 +261,8 @@ class Dataset(object):
             self._features.extend(features)
 
     def prepare(self, database):
-        print('[Dataset] Pre-calculated train file not found, calculating training data...')
-        start_time = time.clock()
+        logger.info('Pre-calculated train file not found, calculating training data...')
+        start_time = time.time()
         self._database = Database(database)
 
         self._database.update_geohash()
@@ -289,5 +293,5 @@ class Dataset(object):
         self._calculate_global_parameters()
         self._calculate_features()
 
-        end_time = time.clock()
-        print('[RankNet] Training data calculated in %f seconds.' % (end_time - start_time))
+        end_time = time.time()
+        logger.info('Training data calculated in {} seconds.'.format(end_time - start_time))

@@ -1,12 +1,13 @@
-import random
-import time
 import numpy as np
+import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class RankNet:
     def __init__(self):
         # training data
-        self._dataset = None
         self._is_ready = False
 
         # model
@@ -24,7 +25,7 @@ class RankNet:
         from tensorflow.python.keras.layers import Activation, Add, Dense, Input, Lambda
         from tensorflow.python.keras.models import Model
 
-        dimension = len(features[0])
+        dimension = features.shape[1]
 
         # model
         h_1 = Dense(128, activation="relu")
@@ -33,14 +34,14 @@ class RankNet:
         s = Dense(1)
 
         # relevant document score
-        rel_doc = Input(shape=(dimension,), dtype="float32")
+        rel_doc = Input(shape=(dimension, ), dtype="float32")
         h_1_rel = h_1(rel_doc)
         h_2_rel = h_2(h_1_rel)
         h_3_rel = h_3(h_2_rel)
         rel_score = s(h_3_rel)
 
         # irrelevant document score
-        irr_doc = Input(shape=(dimension,), dtype="float32")
+        irr_doc = Input(shape=(dimension, ), dtype="float32")
         h_1_irr = h_1(irr_doc)
         h_2_irr = h_2(h_1_irr)
         h_3_irr = h_3(h_2_irr)
@@ -58,23 +59,15 @@ class RankNet:
         model.compile(optimizer="adadelta", loss="binary_crossentropy")
 
         # feed in data
-        x1 = []
-        x2 = []
-        y = []
-        for i in range(len(features) - 1):
-            x1.append(features[i])
-            x2.append(features[i + 1])
-            if labels[i][0] == 0 and labels[i][0] == labels[i + 1][0]:
-                y.append([0.5])
-            else:
-                y.append([float(labels[i][0]) / (labels[i][0] + labels[i + 1][0])])
-
-        X1 = np.array(x1)
-        X2 = np.array(x2)
-        y = np.array(y)
+        x1, y1 = features[:-1], labels[:-1]
+        x2, y2 = features[1:], labels[1:]
+        with np.errstate(divide='ignore', invalid='ignore'):
+            rank_scores = y1 / (y1 + y2)
+            rank_scores[rank_scores == np.inf] = 0.5
+            rank_scores = np.nan_to_num(rank_scores, copy=False)
 
         # train
-        model.fit([X1, X2], y, batch_size=batches, epochs=epochs, verbose=1)
+        model.fit([x1, x2], rank_scores, batch_size=batches, epochs=epochs, verbose=1)
 
         self._model = model
 
@@ -83,20 +76,20 @@ class RankNet:
 
     def load(self, path):
         from tensorflow.python.keras.models import load_model
-        print('[TensorFlow] Trained model file found, loading model...')
+        logger.info('Trained model file found, loading model...')
         self._model = load_model(path)
         self._is_ready = True
-        print('[TensorFlow] Trained model loaded.')
+        logger.info('Trained model loaded.')
 
     def save(self, path):
-        print('[TensorFlow] Saving model...')
+        logger.info('Saving model ...')
         self._model.save(path)
-        print('[TensorFlow] Model saved to %s' % path)
+        logger.info('Model saved to {}.'.format(path))
 
     def ndcg(self, y_true, y_score, k=10):
         y_true = y_true.ravel()
         y_score = y_score.ravel()
-        y_true_sorted = sorted(y_true, reverse=True)
+        y_true_sorted = np.sort(y_true)[::-1]
         ideal_dcg = sum((2 ** y_true_sorted[i] - 1.) / np.log2(i + 2) for i in range(k))
 
         dcg = 0
@@ -107,63 +100,47 @@ class RankNet:
         # return ndcg
         return 1 if ideal_dcg == 0 else float(dcg) / float(ideal_dcg)
 
-    def train(self, dataset, rate=1, epochs=3, batches=10):
-        print('[TensorFlow] Start training model...')
-        start_time = time.clock()
-        self._dataset = dataset
-        train_features = dataset.get_features()[:int(len(dataset.get_features()) * rate)]
-        train_labels = dataset.get_labels()[:int(len(dataset.get_features()) * rate)]
-        test_features = dataset.get_features()[int(len(dataset.get_features()) * rate):]
-        test_labels = dataset.get_labels()[int(len(dataset.get_features()) * rate):]
+    def train(self, features, labels, train_ratio=0.8, epochs=3, batches=10):
+        logger.info('Start training model...')
+        start_time = time.time()
+        features = np.asarray(features)
+        labels = np.asarray(labels)
+        if features.shape[0] != labels.shape[0] or labels.shape[1] != 1:
+            raise ValueError('Feature array and label array mismatch, features: {} and labels: {}'
+                             .format(features.shape, labels.shape))
+
+        train_len = int(len(features) * train_ratio)
+        train_features = features[:train_len]
+        train_labels = labels[:train_len]
+        test_features = features[train_len:]
+        test_labels = labels[train_len:]
 
         self._train_model(train_features, train_labels, epochs=epochs, batches=batches)
         self._is_ready = True
-        end_time = time.clock()
-        print('[TensorFlow] Model trained in %f seconds' % (end_time - start_time))
+        end_time = time.time()
+        logger.info('Model trained in {:.1f} seconds'.format(end_time - start_time))
 
-        print('[TensorFlow] Start testing...')
-        test_range = range(len(test_features))
+        logger.info('Start testing...')
 
         ndcg = 0
         for _ in range(1000):
-            test = random.sample(test_range, 10)
-            to_rank_features = []
-            to_rank_labels = []
-            for index in test:
-                to_rank_features.append(test_features[index])
-                to_rank_labels.append(test_labels[index])
+            # pick 10 items from
+            indices = np.random.randint(0, test_features.shape[0], 10)
+            to_rank_features = test_features[indices]
+            to_rank_labels = test_labels[indices]
 
             scores = self._score_function([to_rank_features])[0]
-            ndcg += self.ndcg(np.array(to_rank_labels),  np.array(scores))
+            ndcg += self.ndcg(np.array(to_rank_labels), np.array(scores))
 
-        print('[TensorFlow] testing ended with NDCG %f' % float(ndcg / 1000))
-        return float(ndcg / 1000)
+        logger.info('Test ended with NDCG {:.4f}'.format(ndcg / 1000.0))
+        return ndcg / 1000.0
 
-    def rank(self, query_points, caller):
+    def rank(self, features):
         if not self._is_ready:
-            print('[TensorFlow - 0x%x] Ranker isn\'t ready, train the model or load the pre-trained model first.' % id(caller))
+            logger.error('Ranker isn\'t ready, train the model or load the pre-trained model first.')
             return None
 
-        print('[TensorFlow - 0x%x] Start ranking the query points with size %d.' % (id(caller), len(query_points)))
-
-        features = []
-        for point in query_points:
-            x = self._dataset.vectorize_point(point['neighbors'], u'生活娱乐')
-            features.append(x)
-
-            point['density'] = x[0]
-            point['entropy'] = x[1]
-            point['competitiveness'] = x[2]
-            point['jenson'] = x[3]
-            point['popularity'] = x[4]
-
+        logger.info('Start ranking the features with size {}.'.format(len(features)))
         labels = self._score_function([features])[0]
-
-        for i in range(len(labels)):
-            query_points[i]['score'] = float(labels[i][0])
-
-        query_points.sort(key=lambda p: p['score'], reverse=True)
-
-        print('[TensorFlow - 0x%x] Ranking finished.' % id(caller))
-
-        return query_points
+        logger.info('Rank finished.')
+        return labels

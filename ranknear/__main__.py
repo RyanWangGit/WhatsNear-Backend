@@ -4,26 +4,29 @@ import ranknear
 def main():
     # set up argument parser
     import argparse
-    parser = argparse.ArgumentParser(description='Backend for WhatsNear.')
-    parser.add_argument('-p', '--port',
-                        action='store', dest='port', default=80, type=int,
-                        help='The port to listen on.', required=False)
+    parser = argparse.ArgumentParser(description='RankNear - Rank the locations nearby using RankNet.')
     parser.add_argument('-s', '--sqlite',
                         action='store', dest='sqlite', type=str,
                         help='The SQLite3 database to read from.', required=True)
     parser.add_argument('-t', '--train',
                         action='store', dest='train', type=str,
                         help='The training matrix file to read from.', required=False)
-    parser.add_argument('-i', '--ip',
-                        action='store', dest='ip', default='127.0.0.1', type=str,
-                        help='The ip to bind on.', required=False)
-    parser.add_argument('-m', '--model',
+    parser.add_argument('-o', '--out',
                         action='store', dest='model', type=str,
-                        help='The trained model to read from.', required=False)
+                        help='The model file to output.', default='./model', required=False)
     results = parser.parse_args()
 
-    # start server
-    ranknear.start_server(results.sqlite, results.train, results.model, results.ip, results.port)
+    # train the model
+    database = ranknear.Database(results.sqlite)
+    dataset = ranknear.Dataset()
+    if results.train:
+        dataset.load(results.train)
+    else:
+        dataset.prepare(database)
+
+    ranknet = ranknear.RankNet()
+    ranknet.train(dataset.get_features(), dataset.get_labels())
+    ranknet.save(results.model)
 
 
 if __name__ == '__main__':
