@@ -17,6 +17,16 @@ def main():
     results = parser.parse_args()
 
     # train the model
+    database = ranknear.Database(results.sqlite)
+    dataset = ranknear.Dataset()
+    if results.train:
+        dataset.load(results.train)
+    else:
+        dataset.prepare(database)
+
+    ranknet = ranknear.RankNet()
+    ranknet.train(dataset.get_features(), dataset.get_labels())
+    ranknet.save(results.out)
 
 
 if __name__ == '__main__':
