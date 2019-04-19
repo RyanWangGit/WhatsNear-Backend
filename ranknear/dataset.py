@@ -66,7 +66,7 @@ class Dataset(object):
 
     def load(self, path):
         logger.info('Pre-calculated train file found, loading from external file...')
-        start_time = time.clock()
+        start_time = time.time()
 
         with open(path, 'r') as f:
             self._mean_category_number = json.loads(f.readline())
@@ -75,7 +75,7 @@ class Dataset(object):
             self._labels = json.loads(f.readline())
             self._features = json.loads(f.readline())
 
-        end_time = time.clock()
+        end_time = time.time()
         logger.info('Training data read in %f seconds.' % (end_time - start_time))
 
     def save(self, path):
@@ -262,7 +262,7 @@ class Dataset(object):
 
     def prepare(self, database):
         logger.info('Pre-calculated train file not found, calculating training data...')
-        start_time = time.clock()
+        start_time = time.time()
         self._database = Database(database)
 
         self._database.update_geohash()
@@ -293,5 +293,5 @@ class Dataset(object):
         self._calculate_global_parameters()
         self._calculate_features()
 
-        end_time = time.clock()
+        end_time = time.time()
         logger.info('Training data calculated in {} seconds.'.format(end_time - start_time))
