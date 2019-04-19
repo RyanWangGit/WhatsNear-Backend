@@ -4,7 +4,7 @@ import ranknear
 def main():
     # set up argument parser
     import argparse
-    parser = argparse.ArgumentParser(description='Backend for WhatsNear.')
+    parser = argparse.ArgumentParser(description='RankNear - Rank the locations nearby using RankNet.')
     parser.add_argument('-s', '--sqlite',
                         action='store', dest='sqlite', type=str,
                         help='The SQLite3 database to read from.', required=True)
