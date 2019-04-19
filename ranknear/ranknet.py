@@ -79,7 +79,7 @@ class RankNet:
         logger.info('Trained model file found, loading model...')
         self._model = load_model(path)
         self._is_ready = True
-        logger.info(' Trained model loaded.')
+        logger.info('Trained model loaded.')
 
     def save(self, path):
         logger.info('Saving model ...')
@@ -130,7 +130,7 @@ class RankNet:
             to_rank_labels = test_labels[indices]
 
             scores = self._score_function([to_rank_features])[0]
-            ndcg += self.ndcg(np.array(to_rank_labels),  np.array(scores))
+            ndcg += self.ndcg(np.array(to_rank_labels), np.array(scores))
 
         logger.info('Test ended with NDCG {:.4f}'.format(ndcg / 1000.0))
         return ndcg / 1000.0
