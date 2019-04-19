@@ -1,7 +1,6 @@
 import tornado.ioloop
 import tornado.web
 import json
-import os
 from ranknear.ranknet import RankNet
 from ranknear.database import Database
 
