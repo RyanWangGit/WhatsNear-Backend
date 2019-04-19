@@ -103,10 +103,12 @@ class RankNet:
     def train(self, features, labels, train_ratio=1, epochs=3, batches=10):
         logger.info('Start training model...')
         start_time = time.time()
-        assert isinstance(features, np.ndarray) and isinstance(labels, np.ndarray), \
-            'Training data should be in the form of numpy.ndarray'
-        assert features.shape[0] == labels.shape[0] and labels.shape[1] == 1, \
-            'Feature array and label array mismatch, features: {} and labels: {}'.format(features.shape, labels.shape)
+        features = np.asarray(features)
+        labels = np.asarray(labels)
+        if features.shape[0] != labels.shape[0] or labels.shape[1] != 1:
+            raise ValueError('Feature array and label array mismatch, features: {} and labels: {}'
+                             .format(features.shape, labels.shape))
+
         train_len = int(len(features) * train_ratio)
         train_features = features[:train_len]
         train_labels = labels[:train_len]
