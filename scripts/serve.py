@@ -36,7 +36,7 @@ class QueryHandler(tornado.web.RequestHandler):
 
             points.append(new_point)
 
-        ranked_points = ranknet.rank(points, self)
+        ranked_points = ranknet.rank(points)
 
         self.write(json.dumps(ranked_points))
 
