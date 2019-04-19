@@ -26,7 +26,7 @@ def main():
 
     ranknet = ranknear.RankNet()
     ranknet.train(dataset.get_features(), dataset.get_labels())
-    ranknet.save(results.out)
+    ranknet.save(results.model)
 
 
 if __name__ == '__main__':
