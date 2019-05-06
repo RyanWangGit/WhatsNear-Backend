@@ -1,4 +1,4 @@
-# RankNear [![Build Status](https://www.travis-ci.org/RyanWangGit/ranknear.svg?branch=master)](https://www.travis-ci.org/RyanWangGit/ranknear) [![codecov](https://codecov.io/gh/RyanWangGit/ranknear/branch/master/graph/badge.svg)](https://codecov.io/gh/RyanWangGit/WhatsNear-Backend)
+# RankNear [![Build Status](https://www.travis-ci.org/yxwangcs/ranknear.svg?branch=master)](https://www.travis-ci.org/yxwangcs/ranknear) [![codecov](https://codecov.io/gh/yxwangcs/ranknear/branch/master/graph/badge.svg)](https://codecov.io/gh/yxwangcs/ranknear)
 
 Rank the locations nearby using RankNet.
 
@@ -19,4 +19,4 @@ Simply run `python __main__.py [args]` to learn from the train data and starts t
 \[1] Burges C, Shaked T, Renshaw E, et al. Learning to rank using gradient descent\[C]//Proceedings of the 22nd international conference on Machine learning. ACM, 2005: 89-96.
 
 ## License
-[MIT](https://github.com/RyanWangGit/WhatsNear-Backend/blob/master/LICENSE).
+[MIT](https://github.com/yxwangcs/ranknear/blob/master/LICENSE).
