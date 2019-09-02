@@ -1,4 +1,4 @@
-# RankNear [![Build Status](https://www.travis-ci.org/yxwangcs/ranknear.svg?branch=master)](https://www.travis-ci.org/yxwangcs/ranknear) [![codecov](https://codecov.io/gh/yxwangcs/ranknear/branch/master/graph/badge.svg)](https://codecov.io/gh/yxwangcs/ranknear)
+# RankNear [![Build Status](https://www.travis-ci.com/yxwangcs/ranknear.svg?branch=master)](https://www.travis-ci.org/yxwangcs/ranknear) [![codecov](https://codecov.io/gh/yxwangcs/ranknear/branch/master/graph/badge.svg)](https://codecov.io/gh/yxwangcs/ranknear)
 
 Rank the locations nearby using RankNet.
 
